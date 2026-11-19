@@ -1,0 +1,4 @@
+- Aggiornamenti automatici con avviso nell'app
+- Tutorial delle novità dopo ogni aggiornamento
+- Nuova animazione di apertura
+- Sezione Mese, mese per mese
