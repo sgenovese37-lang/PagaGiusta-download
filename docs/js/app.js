@@ -77,7 +77,7 @@
       var f = inp.files && inp.files[0]; if (!f) return;
       var r = new FileReader();
       r.onload = function () { importaBytes(new Uint8Array(r.result), cb); };
-      r.onerror = function () { toast('Non riesco ad aprire il file'); };
+      r.onerror = function () { erroreBusta(new Error('Il telefono non mi fa aprire il file (' + (f.name || '') + ')'), null); };
       r.readAsArrayBuffer(f);
     };
     inp.click();
@@ -90,8 +90,20 @@
       if (cb) cb(b); else { ui.tab = 'busta'; ui.bustaSel = b.mese; render(); }
       toast('Busta di ' + meseKeyLabel(b.mese).toLowerCase() + ' letta');
     }).catch(function (e) {
-      toast('Non riesco a leggere questa busta: ' + (e && e.message ? e.message : 'formato sconosciuto'));
+      erroreBusta(e, bytes);
     });
+  }
+
+  function erroreBusta(e, bytes) {
+    var msg = e && e.message ? e.message : String(e);
+    var info = 'Dimensione file: ' + (bytes ? Math.round(bytes.length / 1024) + ' KB' : '?') + ' · Inizio: ' + (bytes ? String.fromCharCode.apply(null, bytes.subarray(0, 8)).replace(/[^\x20-\x7e]/g, '?') : '?') +
+      ' · ' + (typeof DecompressionStream === 'undefined' ? 'senza DS' : 'con DS') + ' · ' + navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 90);
+    var el = document.createElement('div'); el.className = 'nv';
+    el.innerHTML = '<div class="box" role="dialog"><div class="top"><span>Busta non letta</span></div><h2>Non riesco a leggere questa busta</h2>' +
+      '<p>' + esc(msg) + '</p><p class="small" style="font-size:12px;color:var(--tx2)">Se il problema continua, fai uno screenshot di questa schermata e mandalo a chi ti ha dato l\'app.<br>' + esc(info) + '</p>' +
+      '<button class="btn" data-x="1">Chiudi</button></div>';
+    el.querySelector('[data-x]').onclick = function () { el.remove(); };
+    document.body.appendChild(el);
   }
 
   // chiamata dall'app Android quando condividi un PDF con PagaGiusta
