@@ -1,3 +1,2 @@
-- Aggiornamenti con un tocco: download dentro l'app con barra di avanzamento
-- Installazione che parte da sola, senza browser
-- Messaggio di benvenuto per i nuovi colleghi
+- Nuovi giorni da segnare: Legge 104, permesso privato, chiusura aziendale
+- Trattenute stimate del mese: INPS, quota sindacale, Cometa e tasse
