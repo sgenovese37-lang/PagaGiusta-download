@@ -10,6 +10,12 @@ App Android per leggere e controllare la busta paga (PDF scaricato da EGO): spie
 
 Apri il file scaricato e installalo. Se Android lo chiede, consenti l'installazione; se compare l'avviso di Play Protect tocca *"Installa comunque"*.
 
+## 🍎 Per iPhone
+
+👉 **[Apri PagaGiusta per iPhone](https://sgenovese37-lang.github.io/PagaGiusta-download/)**
+
+Aprilo con Safari, tocca **Condividi → "Aggiungi alla schermata Home"** e usa PagaGiusta dall'icona: funziona anche senza internet.
+
 ## 🔒 Privacy
 
 - Le tue buste paga e i tuoi dati restano **solo sul tuo telefono**: non vengono inviati, condivisi o salvati altrove. Nessuno può vederli, nemmeno chi ha creato l'app.
