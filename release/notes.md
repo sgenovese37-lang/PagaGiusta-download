@@ -1,2 +1,3 @@
-- Messaggio di benvenuto per chi installa l'app la prima volta
-- Piccoli miglioramenti
+- Aggiornamenti con un tocco: download dentro l'app con barra di avanzamento
+- Installazione che parte da sola, senza browser
+- Messaggio di benvenuto per i nuovi colleghi
