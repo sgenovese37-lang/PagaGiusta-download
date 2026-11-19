@@ -205,10 +205,21 @@
   }
 
   // ---- Turni ----
-  function tInfo(t) {
+  function tInfo(t, wk) {
     var T = Object.assign({}, C.TURNI[t] || { nome: 'Turno', orario: '', esteso: '' });
-    if (t === 'C') { var ci = C.infoC(state); T.orario = ci.orario; T.esteso = ci.esteso; }
+    if (t === 'C') {
+      var k = (wk && state.settimaneC && state.settimaneC[wk]) || state.centrale || '0730';
+      var ci = C.CENTRALI[k] || C.CENTRALI['0730']; T.orario = ci.orario; T.esteso = ci.esteso;
+    }
     return T;
+  }
+  // settimana futura non confermata = turno "previsto"
+  function previsto(d) {
+    var wk = C.key(C.monday(d));
+    if (wk <= C.key(C.monday(oggi))) return false;
+    if (state.settimane && state.settimane[wk]) return false;
+    if (state.giorni && state.giorni[C.key(d)]) return false;
+    return true;
   }
   function infoTurno(g) {
     if (g.tipo !== 'lavoro') {
@@ -218,7 +229,7 @@
       if (g.lavorate > 0) chips.push(ore(g.lavorate) + ' h lavorate');
       return { cls: 't-free', big: C.TIPI[g.tipo] + (g.ore && g.ore < 8 && g.tipo !== 'malattia' ? ' · ' + ore(g.ore) + ' h' : ''), chips: chips };
     }
-    var T = tInfo(g.turno), ch = [];
+    var T = tInfo(g.turno, C.key(C.monday(g.data))), ch = [];
     if (g.turno === 'N') ch.push('8 h di notte al 60,5%');
     else if (g.turno === 'P') ch.push('4 h al 27,5% (18–22)');
     else ch.push('Nessuna maggiorazione');
@@ -242,17 +253,19 @@
   function renderTurni() {
     var g = C.giorno(state, oggi), it = infoTurno(g);
     var y = ui.calY, m = ui.calM, days = C.giorniMese(y, m), first = (days[0].getDay() + 6) % 7;
-    var cells = '', nN = 0, nMP = 0;
+    var cells = '', nN = 0, nMP = 0, nPrev = 0;
     for (var i = 0; i < first; i++) cells += '<div class="day empty"></div>';
     days.forEach(function (d) {
       var gd = C.giorno(state, d), cls = 'day', lab = '';
-      if (gd.tipo === 'lavoro') { cls += ' t-' + gd.turno; lab = gd.turno; if (gd.turno === 'N') nN++; else nMP++; }
+      var NOMI_X = { ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integrazione', malattia: 'Malattia', congedo: 'Congedo', legge104: 'Legge 104', corso: 'Corso', permesso: 'Permesso', sciopero: 'Sciopero', chiusura: 'Chiusura', festa: 'Festa' };
+      if (gd.tipo === 'lavoro') { cls += ' t-' + gd.turno; lab = tInfo(gd.turno).nome; if (gd.turno === 'N') nN++; else nMP++; }
       else if (gd.tipo === 'libero') { cls += ' t-free'; }
-      else { cls += ' x-' + gd.tipo; lab = { ferie: 'F', rol: 'R', cig: 'CI', malattia: 'MA', congedo: 'CP', legge104: '104', corso: 'C', permesso: 'PP', sciopero: 'SC', chiusura: 'CA', festa: '' }[gd.tipo] || ''; if (gd.lavorate > 0 && gd.turno) lab += '·' + gd.turno; }
+      else { cls += ' x-' + gd.tipo; lab = NOMI_X[gd.tipo] || ''; }
       if (gd.tipo === 'libero') cls = 'day t-free';
       if (C.key(d) === C.key(oggi)) cls += ' today-ring';
+      if (gd.tipo !== 'libero' && previsto(d)) { cls += ' prev'; nPrev++; }
       var dot = gd.straord ? '<i class="dot"></i>' : '';
-      cells += '<button class="' + cls + '" data-day="' + C.key(d) + '" style="' + (gd.tipo === 'libero' ? 'background:var(--free-bg);color:var(--free-tx)' : '') + '">' + dot + '<span class="n">' + d.getDate() + '</span><span class="t">' + lab + '</span></button>';
+      cells += '<button class="' + cls + '" data-day="' + C.key(d) + '" style="' + (gd.tipo === 'libero' ? 'background:var(--free-bg);color:var(--free-tx)' : '') + '">' + dot + '<span class="n">' + d.getDate() + '</span><span class="t' + (lab.length > 8 ? ' sm' : '') + '">' + (lab === 'Cassa integrazione' ? 'Cassa<br>integrazione' : lab) + '</span></button>';
     });
     return '<div class="screen">' +
       '<div class="topbar"><div><div class="kicker">Paga<b style="color:var(--teal-tx)">Giusta</b><span class="beta">BETA</span></div><h1>I miei turni</h1></div>' +
@@ -261,7 +274,7 @@
       '<button class="today ' + it.cls + '" data-day="' + C.key(oggi) + '" style="border:none;text-align:left;width:100%">' +
       '<div class="lab">Oggi · ' + GG[oggi.getDay()] + ' ' + oggi.getDate() + ' ' + MESI[oggi.getMonth()] + '</div>' +
       '<div class="big">' + esc(it.big) + '</div><div class="chips">' + it.chips.map(function (c) { return '<span class="chip">' + esc(c) + '</span>'; }).join('') + '</div></button>' +
-      '<div class="card"><div class="cal-head"><button class="iconbtn" data-act="calPrev" aria-label="Mese precedente">' + IC.left + '</button>' +
+      '<div class="card cal"><div class="cal-head"><button class="iconbtn" data-act="calPrev" aria-label="Mese precedente">' + IC.left + '</button>' +
       '<div style="text-align:center"><b>' + meseNome(y, m) + '</b><div class="muted small">' + nN + ' notti · ' + nMP + ' mattine/pom.</div></div>' +
       '<button class="iconbtn" data-act="calNext" aria-label="Mese successivo">' + IC.right + '</button></div>' +
       '<div class="grid7" style="margin-bottom:6px"><div class="wd">L</div><div class="wd">M</div><div class="wd">M</div><div class="wd">G</div><div class="wd">V</div><div class="wd">S</div><div class="wd">D</div></div>' +
@@ -278,6 +291,7 @@
     var d = C.parse(k), g = C.giorno(state, d), ov = Object.assign({}, state.giorni[k] || {});
     var tipo = ov.tipo || g.tipo, oreV = ov.ore !== undefined ? ov.ore : (state.oreGiorno || 8), straord = ov.straord || 0;
     var wk = C.key(C.monday(d)), turnoSett = C.turno(state, d);
+    var orC = (state.settimaneC && state.settimaneC[wk]) || state.centrale || '0730';
     var sc = document.createElement('div'); sc.className = 'scrim';
     function draw() {
       var tipi = ['lavoro', 'ferie', 'rol', 'cig', 'malattia', 'congedo', 'legge104', 'permesso', 'sciopero', 'chiusura', 'corso', 'festa'];
@@ -287,7 +301,9 @@
       sc.innerHTML = '<div class="sheet" role="dialog" aria-label="Giorno"><div class="grab"></div>' +
         '<h2>' + cap(GG[d.getDay()]) + ' ' + d.getDate() + ' ' + MESI[d.getMonth()] + '</h2>' +
         '<div><div class="stepn" style="margin-bottom:8px">Turno di tutta la settimana</div><div class="seg">' +
-        ['M', 'P', 'N', 'C'].map(function (t) { return '<button class="opt t-' + t + (turnoSett === t ? ' on' : '') + '" data-wk="' + t + '">' + tInfo(t).nome + '</button>'; }).join('') + '</div></div>' +
+        ['M', 'P', 'N', 'C'].map(function (t) { return '<button class="opt t-' + t + (turnoSett === t ? ' on' : '') + '" data-wk="' + t + '">' + tInfo(t).nome + '</button>'; }).join('') + '</div>' +
+        (turnoSett === 'C' ? '<div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:8px">' + ['0730', '0900'].map(function (k) { return '<button class="opt t-C' + (orC === k ? ' on' : '') + '" data-orc="' + k + '">' + C.CENTRALI[k].esteso + '</button>'; }).join('') + '</div>' : '') +
+        (previsto(d) ? '<div class="muted small" style="margin-top:8px">Questa settimana è <b>prevista</b> dalla rotazione: salvando la confermi.</div>' : '') + '</div>' +
         '<div><div class="stepn" style="margin-bottom:8px">Questo giorno</div><div class="opts">' +
         (weekend ? '<button class="opt' + (tipo === 'libero' ? ' on' : '') + '" data-tipo="libero">Libero</button>' : '') +
         tipi.filter(function (t) { return !weekend || t === 'lavoro' || t === 'corso'; }).map(function (t) { return '<button class="opt' + (tipo === t ? ' on' : '') + '" data-tipo="' + t + '">' + nomi[t] + '</button>'; }).join('') + '</div></div>' +
@@ -301,11 +317,14 @@
         '<button class="btn" data-save="1">Salva</button><button class="btn secondary" data-close="1">Annulla</button></div>';
       sc.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { tipo = b.getAttribute('data-tipo'); draw(); }; });
       sc.querySelectorAll('[data-wk]').forEach(function (b) { b.onclick = function () { turnoSett = b.getAttribute('data-wk'); draw(); }; });
+      sc.querySelectorAll('[data-orc]').forEach(function (b) { b.onclick = function () { orC = b.getAttribute('data-orc'); draw(); }; });
       sc.querySelectorAll('[data-o]').forEach(function (b) { b.onclick = function () { oreV = Math.max(1, Math.min(state.oreGiorno || 8, oreV + +b.getAttribute('data-o'))); draw(); }; });
       sc.querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { straord = Math.max(0, Math.min(12, straord + +b.getAttribute('data-s'))); draw(); }; });
       sc.querySelector('[data-close]').onclick = function () { sc.remove(); };
       sc.querySelector('[data-save]').onclick = function () {
-        if (turnoSett !== C.turno(state, d)) state.settimane[wk] = turnoSett;
+        if (turnoSett !== C.turno(state, d) || previsto(d)) state.settimane[wk] = turnoSett;
+        state.settimaneC = state.settimaneC || {};
+        if (turnoSett === 'C') state.settimaneC[wk] = orC; else delete state.settimaneC[wk];
         var def = g.weekend ? 'libero' : g.festa ? 'festa' : 'lavoro';
         var nv = {};
         if (tipo !== def) nv.tipo = tipo;
@@ -585,12 +604,15 @@
   }
 
   // ---------- Tutorial delle novità (dopo ogni aggiornamento) ----------
-  var NOVITA_ID = '1.0-beta-16';
+  var NOVITA_ID = '1.0-beta-17';
   var NOVITA = [
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5h4"/></svg>',
-      t: 'Solidarietà', d: 'Se lavori meno ore perché sei in solidarietà (ad esempio 6 ore di lavoro e 2 di cassa integrazione ogni giorno), impostalo nelle Impostazioni alla voce "Solidarietà". Non è un part-time: la paga base resta quella del tempo pieno e l\'app calcola la cassa integrazione di ogni giorno.' },
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/></svg>',
-      t: 'Nuove voci della busta', d: 'PagaGiusta ora riconosce e spiega anche la cassa integrazione con codice 973, il welfare (beni e servizi), i permessi per la malattia dei figli, le ferie dell\'anno precedente e le festività. I controlli dei conti sono più precisi e la stima del mese tiene conto dell\'esonero contributivo.' }
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
+      t: 'Turni futuri "previsti"', d: 'Nel calendario le settimane future ora sono sbiadite: sono solo una previsione in base alla rotazione. Diventano sicure quando arriva la settimana, oppure toccando un giorno e salvando. Le settimane passate restano compilate per il controllo della busta.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      t: 'Orario centrale per una settimana', d: 'Se una settimana fai l\'orario centrale, tocca un giorno, scegli "Centrale" e poi l\'orario: 7:30 – 16:00 oppure 9:00 – 17:30. La scelta vale solo per quella settimana.' }
+,
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M7 13h4M7 17h7"/></svg>',
+      t: 'Calendario più leggibile', d: 'Le caselle del calendario sono più grandi e i turni sono scritti per intero (Mattina, Pomeriggio, Notte, Centrale), come anche ferie, permessi, cassa integrazione e tutte le altre giornate.' }
   ];
   function mostraNovita(forza) {
     if (!forza && (!state.onboarded || state.novitaViste === NOVITA_ID)) return;

@@ -1,4 +1,3 @@
-- Nuova impostazione: solidarietà (cassa integrazione ogni giorno)
-- Riconosce nuove voci: cassa integrazione 973, welfare, permessi malattia figli, ferie anno precedente, festività
-- Stima del mese con l'esonero contributivo
-- Controlli dei conti più precisi
+- Calendario più leggibile: caselle più grandi e nomi scritti per intero
+- Le settimane future sono segnate come previste
+- Orario centrale scelto settimana per settimana (7:30-16:00 o 9:00-17:30)

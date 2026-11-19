@@ -245,3 +245,14 @@ select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px soli
 .day.x-sciopero { background: #E5E7EB; color: #111827; box-shadow: inset 0 0 0 2px #DC2626; }
 .seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .settings .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.day.prev { opacity: .45; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 4px, transparent 4px 8px); }
+.seg .opt.t-C.on { box-shadow: 0 0 0 3px var(--teal-tx); }
+
+/* calendario con nomi interi */
+.cal .grid7 { gap: 4px; }
+.cal { padding: 14px 10px; }
+.day { height: 60px; border-radius: 10px; padding: 2px 1px; gap: 3px; justify-content: flex-start; padding-top: 8px; }
+.day .n { font-size: 15px; }
+.day .t { font-size: 8.5px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; text-align: center; white-space: nowrap; max-width: 100%; }
+.day .t.sm { font-size: 7.4px; letter-spacing: -0.03em; }
+.day.prev { opacity: .55; }
