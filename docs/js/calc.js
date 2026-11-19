@@ -73,6 +73,8 @@
     var t = turno(state, d);
     var tipo = ov.tipo || (weekend ? 'libero' : festa ? 'festa' : 'lavoro');
     var ore = ov.ore !== undefined ? Math.min(ov.ore, oreG) : oreG;
+    // contratto di solidarietà: ogni giorno di lavoro ha alcune ore di cassa integrazione
+    if (!ov.tipo && tipo === 'lavoro' && state.solidOre > 0) { tipo = 'cig'; ore = Math.min(state.solidOre, oreG); }
     var g = { key: k, data: d, turno: t, tipo: tipo, festa: festa, weekend: weekend, straord: ov.straord || 0, ore: ore, nota: ov.nota || '' };
     // ore lavorate e assenze
     g.lavorate = 0; g.ferie = 0; g.rol = 0; g.cig = 0; g.corso = 0; g.assenza = 0; g.congedo = 0; g.malattia = 0; g.l104 = 0; g.sciopero = 0;
@@ -113,10 +115,12 @@
     p.buono = state.buono || REGOLE.buono;
     p.rapportoNetto = b && b.netto && b.totComp ? b.netto / b.totComp : 0.75;
     p.congedoPct = 0.3;
-    p.sindacatoPct = 0; p.cometaPct = 0;
+    p.sindacatoPct = 0; p.cometaPct = 0; p.esoneroPct = 0;
     if (b) {
       var vs = b.voci.find(function (v) { return (v.code === '813' || v.code === '814' || /SIND/.test(v.desc)) && v.tratt; });
       if (vs && vs.aliquota) p.sindacatoPct = vs.aliquota;
+      var ve = b.voci.find(function (v) { return v.code === '1110' && v.comp; });
+      if (ve && ve.aliquota) p.esoneroPct = ve.aliquota;
       var vc = b.voci.find(function (v) { return v.code === '1286' && v.tratt; });
       if (vc && vc.aliquota) p.cometaPct = vc.aliquota;
     }
@@ -159,6 +163,10 @@
     if (o.sciopero) r.push({ voce: 'Sciopero · ' + fmtOre(o.sciopero) + ' h (non pagate)', importo: -o.sciopero * po });
     if (o.l104) r.push({ voce: 'Permessi Legge 104 · ' + fmtOre(o.l104) + ' h', importo: 0, nota: 'Pagati come ore normali (l\'azienda li anticipa per l\'INPS), ma senza incentivi' });
     if (o.chiusura) r.push({ voce: 'Chiusura aziendale · ' + fmtOre(o.chiusura) + ' h', importo: 0, nota: 'Pagata con le ferie: le ore vengono scalate dalle tue ferie' });
+    if (p.esoneroPct) {
+      var impEs = r.reduce(function (a, x) { return a + x.importo; }, 0) - o.cig * cigOra;
+      r.push({ voce: 'Esonero contributivo (stima)', importo: impEs * p.esoneroPct / 100, stima: true, nota: 'Sconto sui contributi presente nella tua ultima busta' });
+    }
     s.righe = r;
     s.lordo = r.reduce(function (a, x) { return a + x.importo; }, 0);
     s.netto = s.lordo * p.rapportoNetto;
@@ -195,7 +203,7 @@
   function giorniDaBusta(state, busta) {
     var y = +busta.mese.slice(0, 4), m = +busta.mese.slice(5, 7), rc = busta.righeCal || {}, out = { giorni: {}, settimane: {} };
     function riga(re) { for (var k in rc) if (re.test(k)) return rc[k].giorni; return {}; }
-    var ret = riga(/^RETRIB/), notte = riga(/^MAGG/), ferie = riga(/^FERIE/), cig = riga(/^SOL|^CIG|^INT/), corsi = riga(/^CORSI/), straord = riga(/^STRAORD/);
+    var ret = riga(/^RETRIB/), notte = riga(/^MAGG/), ferie = riga(/^FERIE/), cig = riga(/^SOL|^CIG|^INT/), corsi = riga(/^CORSI/), straord = riga(/^STRAORD/), sciop = riga(/^SCIOP/), l104 = riga(/104/);
     var votiSett = {};
     giorniMese(y, m).forEach(function (d) {
       var dd = d.getDate(), k = key(d), wd = d.getDay();
@@ -203,6 +211,8 @@
       var h = function (v) { return v ? parseFloat(v) : 0; };
       var g = {};
       if (h(ferie[dd]) >= 8) g = { tipo: 'ferie', ore: 8 };
+      else if (h(sciop[dd]) > 0) g = { tipo: 'sciopero', ore: h(sciop[dd]) };
+      else if (h(l104[dd]) > 0) g = { tipo: 'legge104', ore: h(l104[dd]) };
       else if (h(cig[dd]) > 0) g = { tipo: 'cig', ore: h(cig[dd]) };
       else if (h(corsi[dd]) > 0) g = { tipo: 'corso', ore: h(corsi[dd]) };
       else if (h(ferie[dd]) > 0) g = { tipo: 'ferie', ore: h(ferie[dd]) };

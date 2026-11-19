@@ -1,5 +1,4 @@
-- Orario centrale (7:30-16:00 o 9:00-17:30)
-- Part-time: ore al giorno e giorni di lavoro
-- Nuovo giorno da segnare: sciopero
-- La sezione Mese si apre sull'ultima busta importata
-- La stima del mese in corso è segnata chiaramente come STIMA
+- Nuova impostazione: solidarietà (cassa integrazione ogni giorno)
+- Riconosce nuove voci: cassa integrazione 973, welfare, permessi malattia figli, ferie anno precedente, festività
+- Stima del mese con l'esonero contributivo
+- Controlli dei conti più precisi

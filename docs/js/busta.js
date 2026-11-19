@@ -182,12 +182,14 @@
         if (Math.abs((v.aliquota || 0) - 27.5) < 0.01) o.pom += u; else o.notte += u;
       } else if (v.code === '900' || /ORE LAVORATE/.test(d)) o.lavorate = (o.lavorate || 0) + u;
       else if (v.code === '902' || /^FERIE/.test(d)) o.ferie += u;
-      else if (v.code === '983' || /CIG|INTEGRAZ.*SAL|SOLIDARIET/.test(d)) o.cig += u;
+      else if (v.code === '983' || v.code === '973' || /CIG|INTEGRAZ.*SAL|SOLIDARIET/.test(d)) o.cig += u;
       else if (v.code === '353' || /STRAORD/.test(d)) { o.straord += u; if (/ N\b|NOTT/.test(d)) o.straordN += u; }
       else if (v.code === '345' || /CORSI|SCUOLA/.test(d)) o.corsi += u;
       else if (v.code === '320' || /^ASSENZE/.test(d)) o.assenze += u;
       else if (v.code === '329' || /FESTIVIT/.test(d)) o.festivita += u;
       else if (v.code === '6831') o.congedo += u;
+      else if (v.code === '935' || /^FERIE A\.?P/.test(d)) o.ferie += u;
+      else if (v.code === '931' || /PERM.*FIGL/.test(d)) o.permFigli = (o.permFigli || 0) + u;
       else if (/MALATT/.test(d) && v.comp) o.malattia += u;
     });
     return o;
@@ -199,15 +201,11 @@
     var errVoci = [];
     b.voci.forEach(function (v) {
       var imp = v.comp !== null ? v.comp : v.tratt;
-      if (imp === null || imp === 0 || v.unita === null || v.valUnit === null) return;
-      if (v.aliquota !== null && v.aliquota > 0 && v.code !== '349' && v.code !== '353' && v.code !== '983') {
-        var calcA = round2(v.valUnit * v.aliquota / 100);
-        if (Math.abs(calcA - imp) > 0.02) errVoci.push(v);
-        return;
-      }
-      if (v.code === '814' || v.code === '813') { if (Math.abs(round2(v.valUnit * (v.aliquota || 0) / 100) - imp) > 0.02) errVoci.push(v); return; }
-      var calc = round2(v.unita * v.valUnit);
-      if (Math.abs(calc - imp) > 0.02) errVoci.push(v);
+      if (imp === null || imp === 0 || v.valUnit === null) return;
+      var okUnita = v.unita !== null && Math.abs(round2(v.unita * v.valUnit) - imp) <= 0.02;
+      var okAliq = v.aliquota !== null && v.aliquota > 0 && Math.abs(round2(v.valUnit * v.aliquota / 100) - imp) <= 0.02;
+      if (v.unita === null && (v.aliquota === null || v.aliquota === 0)) return;
+      if (!okUnita && !okAliq) errVoci.push(v);
     });
     out.push({ ok: errVoci.length === 0, testo: errVoci.length ? 'Calcoli da verificare: ' + errVoci.map(function (v) { return v.code + ' ' + v.desc; }).join(', ') : 'Ogni voce è calcolata correttamente (ore × importo)' });
     if (b.totComp !== null) out.push({ ok: Math.abs(b.totComp - sumComp) < 0.02, testo: 'Totale competenze ' + eur(b.totComp) });
@@ -260,7 +258,11 @@
       case '813': case '814': T.titolo = 'Quota sindacale'; T.testo = 'Il contributo al sindacato: l\'' + n2(v.aliquota, 0) + '% della retribuzione.'; break;
       case '900': T.titolo = 'Ore lavorate'; T.testo = ore(v.unita) + ' ore lavorate davvero nel mese (serve per calcolare gli incentivi).'; T.tipo = 'info'; T.importo = null; break;
       case '902': T.titolo = 'Ore di ferie'; T.testo = ore(v.unita) + ' ore di ferie godute nel mese. Sono pagate con la paga normale, ma senza incentivi e maggiorazioni.'; T.tipo = 'info'; T.importo = null; break;
-      case '983': T.titolo = 'Cassa integrazione (solidarietà)'; T.testo = ore(v.unita) + ' ore di cassa integrazione a ' + n2(v.valUnit, 4) + ' € l\'ora. Te la anticipa l\'azienda, poi la paga l\'INPS. L\'importo orario ha un tetto massimo fissato ogni anno.'; break;
+      case '973': case '983': T.titolo = 'Cassa integrazione (solidarietà)'; T.testo = ore(v.unita) + ' ore di cassa integrazione a ' + n2(v.valUnit, 4) + ' € l\'ora. Te la anticipa l\'azienda, poi la paga l\'INPS. L\'importo orario ha un tetto massimo fissato ogni anno.'; break;
+      case '586': T.titolo = 'Beni e servizi (welfare)'; T.testo = 'Il valore di beni o servizi che l\'azienda ti ha dato (ad esempio buoni o welfare): ' + eur(v.valUnit) + '. Non sono soldi in busta, ma vengono indicati per le tasse e i contributi.'; T.tipo = 'info'; T.importo = v.valUnit; break;
+      case '901': T.titolo = 'Ore di festività'; T.testo = ore(v.unita) + ' ore di festa infrasettimanale: sono già pagate nella paga del mese.'; T.tipo = 'info'; T.importo = null; break;
+      case '931': T.titolo = 'Permessi malattia figli'; T.testo = ore(v.unita) + ' ore di permesso per la malattia di un figlio sotto i 3 anni. Non sono pagate: rientrano nelle ore di assenza tolte dalla paga.'; T.tipo = 'info'; T.importo = null; break;
+      case '935': T.titolo = 'Ferie dell\'anno precedente'; T.testo = ore(v.unita) + ' ore di ferie godute, prese da quelle avanzate dall\'anno scorso.'; T.tipo = 'info'; T.importo = null; break;
       case '1001': T.titolo = 'Contributi INPS'; T.testo = 'Il ' + n2(v.aliquota, 2) + '% del lordo (' + eur(v.valUnit) + ') per la tua pensione futura.'; break;
       case '1110': T.titolo = 'Esonero contributivo'; T.testo = 'Uno sconto sui contributi previsto dalla legge (L. 213/2023) per alcune categorie di lavoratori: ti viene restituita una parte dei contributi.'; break;
       case '1285': T.titolo = 'Cometa: quota dell\'azienda'; T.testo = 'L\'azienda versa per te il ' + n2(v.aliquota, 1) + '% al fondo pensione Cometa (' + eur(v.valUnit) + '). Non ti viene tolto niente.'; T.tipo = 'info'; T.importo = v.valUnit; break;
@@ -271,6 +273,7 @@
       case '2086': T.titolo = 'Tassa agevolata sui premi'; T.testo = 'Su una parte degli incentivi (' + eur(v.valUnit) + ') paghi solo l\'' + n2(v.aliquota, 0) + '% di tasse invece dell\'IRPEF normale. È un vantaggio per te.'; break;
       default:
         if (/104/.test(d)) { T.titolo = 'Permessi Legge 104'; T.testo = (v.unita ? ore(v.unita) + ' ore di permesso Legge 104. ' : '') + 'Sono permessi pagati: l\'azienda te li anticipa e poi li recupera dall\'INPS.'; break; }
+        if (/CIG/.test(d)) { T.titolo = 'Cassa integrazione'; T.testo = (v.unita ? ore(v.unita) + ' ore di cassa integrazione' + (v.valUnit ? ' a ' + n2(v.valUnit, 4) + ' € l\'ora' : '') + '. ' : '') + 'Te la anticipa l\'azienda, poi la paga l\'INPS.'; break; }
         if (/SCIOP/.test(d)) { T.titolo = 'Sciopero'; T.testo = (v.unita ? ore(v.unita) + ' ore di sciopero. ' : '') + 'Le ore di sciopero non sono pagate: vengono tolte dalla paga del mese.'; break; }
         if (/CHIUS|FERIE COLL/.test(d)) { T.titolo = 'Chiusura aziendale'; T.testo = (v.unita ? ore(v.unita) + ' ore di chiusura aziendale. ' : '') + 'Di solito vengono coperte con le ferie collettive.'; break; }
         if (/PERM/.test(d)) { T.titolo = titoloBello(v.desc); T.testo = (v.unita ? ore(v.unita) + ' ore di permesso. ' : '') + (v.tratt ? 'Sono permessi non pagati: vengono tolti dalla paga.' : 'Ore di permesso del mese.'); break; }

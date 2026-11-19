@@ -438,6 +438,9 @@
       '<div class="stepn" style="margin:12px 0 8px">Giorni in cui lavori</div><div class="grid7">' +
       [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'G'], [5, 'V'], [6, 'S'], [0, 'D']].map(function (x) { var on = (state.giorniLav || [1, 2, 3, 4, 5]).indexOf(x[0]) >= 0; return '<button class="opt' + (on ? ' on' : '') + '" data-gl="' + x[0] + '" style="min-height:44px;padding:0">' + x[1] + '</button>'; }).join('') + '</div>' +
       '<div class="muted small" style="margin-top:10px">Per il part-time verticale togli i giorni in cui non lavori. La paga base viene presa dalla tua busta.</div></div>' +
+      '<div class="card"><h3>Solidarietà (cassa integrazione ogni giorno)</h3><select id="solidOre" style="width:100%">' +
+      [0, 1, 2, 3, 4].map(function (h) { return '<option value="' + h + '"' + ((state.solidOre || 0) === h ? ' selected' : '') + '>' + (h === 0 ? 'No' : 'Sì, ' + h + ' ' + (h === 1 ? 'ora' : 'ore') + ' di cassa al giorno') + '</option>'; }).join('') + '</select>' +
+      '<div class="muted small" style="margin-top:10px">Se lavori meno ore perché sei in solidarietà (ad esempio 6 ore di lavoro + 2 di cassa integrazione), impostalo qui: NON è un part-time.</div></div>' +
       (state.tipoOrario === 'centrale' ? '' : '<div class="card"><h3>Turno di questa settimana</h3><div class="seg">' + ['M', 'P', 'N'].map(function (t) { return '<button class="opt t-' + t + (turnoOra === t ? ' on' : '') + '" data-anc="' + t + '">' + C.TURNI[t].nome + '</button>'; }).join('') + '</div>' +
       '<div class="muted small" style="margin-top:10px">Da qui l\'app calcola tutte le settimane, avanti e indietro. Le settimane che hai cambiato a mano restano come le hai segnate.</div></div>') +
       '<div class="card list"><div class="li"><span>Ordine dei turni<span class="sub">' + ordTxt + '</span></span><select id="ordine"><option value="NPM"' + (state.ordine.join('') === 'NPM' ? ' selected' : '') + '>Notte → Pom. → Mattina</option><option value="MPN"' + (state.ordine.join('') === 'MPN' ? ' selected' : '') + '>Mattina → Pom. → Notte</option></select></div>' +
@@ -473,6 +476,7 @@
       if (state.tipoOrario === 'turni' && !state.ancora) state.ancora = { settimana: C.key(C.monday(oggi)), turno: 'M' };
       save(); render(); toast('Orario aggiornato');
     };
+    var so = $('#solidOre'); if (so) so.onchange = function () { state.solidOre = +so.value; save(); render(); toast('Salvato'); };
     var og = $('#oreGiorno'); if (og) og.onchange = function () { state.oreGiorno = +og.value; save(); render(); toast('Orario aggiornato'); };
     document.querySelectorAll('[data-gl]').forEach(function (b) {
       b.onclick = function () {
@@ -581,16 +585,12 @@
   }
 
   // ---------- Tutorial delle novità (dopo ogni aggiornamento) ----------
-  var NOVITA_ID = '1.0-beta-11';
+  var NOVITA_ID = '1.0-beta-16';
   var NOVITA = [
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-      t: 'Orario centrale', d: 'Chi fa l\'orario centrale (7:30 – 16:00 oppure 9:00 – 17:30) ora può impostarlo: dalle Impostazioni, in "Il tuo orario". Si può anche segnare una singola settimana di orario centrale toccando un giorno del calendario.' },
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/></svg>',
-      t: 'Part-time', d: 'Chi lavora part-time ora può impostare le ore al giorno (da 4 a 7) e i giorni in cui lavora, dalle Impostazioni. Calendario, stime e controlli si adattano da soli.' },
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg>',
-      t: 'Sciopero', d: 'Toccando un giorno del calendario ora puoi segnare anche lo sciopero, a giornata intera o a ore. Le ore di sciopero non sono pagate e l\'app le toglie dalla stima del mese.' },
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
-      t: 'Il mese giusto, subito', d: 'La sezione Mese ora si apre sull\'ultima busta che hai importato, con le cifre vere della busta. La stima del mese in corso è segnata chiaramente come STIMA.' }
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5h4"/></svg>',
+      t: 'Solidarietà', d: 'Se lavori meno ore perché sei in solidarietà (ad esempio 6 ore di lavoro e 2 di cassa integrazione ogni giorno), impostalo nelle Impostazioni alla voce "Solidarietà". Non è un part-time: la paga base resta quella del tempo pieno e l\'app calcola la cassa integrazione di ogni giorno.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6M9 13h8M9 17h8"/></svg>',
+      t: 'Nuove voci della busta', d: 'PagaGiusta ora riconosce e spiega anche la cassa integrazione con codice 973, il welfare (beni e servizi), i permessi per la malattia dei figli, le ferie dell\'anno precedente e le festività. I controlli dei conti sono più precisi e la stima del mese tiene conto dell\'esonero contributivo.' }
   ];
   function mostraNovita(forza) {
     if (!forza && (!state.onboarded || state.novitaViste === NOVITA_ID)) return;
