@@ -155,15 +155,21 @@
   // ---- Onboarding ----
   function renderOnb() {
     function ch(t) {
-      var T = C.TURNI[t];
+      var T = tInfo(t);
       return '<button class="choice t-' + t + (ui.onbTurno === t ? ' on' : '') + '" data-onbt="' + t + '"><span>' + T.nome + '</span><span>' + T.orario + (ui.onbTurno === t ? ' ✓' : '') + '</span></button>';
+    }
+    function chC(k) {
+      var on = ui.onbTurno === 'C' && (state.centrale || '0730') === k;
+      return '<button class="choice t-C' + (on ? ' on' : '') + '" data-onbc="' + k + '"><span>Orario centrale</span><span>' + C.CENTRALI[k].esteso + (on ? ' ✓' : '') + '</span></button>';
     }
     var bustaOk = ui.onbBusta ? '<div class="status ok"><div class="ic">' + IC.check + '</div><div><b>Busta letta</b><span>' + meseKeyLabel(ui.onbBusta) + ': paga, incentivi, ferie e ROL presi.</span></div></div>' : '';
     return '<div class="screen onb">' +
       '<div class="brand">' + LOGO + '<div class="wordmark">Paga<span>Giusta</span></div><div class="muted">La tua busta paga, finalmente chiara.</div></div>' +
       '<div class="card"><h3>' + IC.lock.replace('stroke-width', 'stroke="currentColor" stroke-width') + ' La tua privacy</h3><div class="muted">' + PRIVACY_TXT + '</div></div>' +
       '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="stepn">1 di 2</div><div class="q">Che turno fai questa settimana?</div>' + ch('M') + ch('P') + ch('N') +
-      '<div class="muted small">I turni girano Notte → Pomeriggio → Mattina. Puoi cambiarlo nelle Impostazioni.</div></div>' +
+      '<div class="muted small">I turni girano Notte → Pomeriggio → Mattina. Puoi cambiarlo nelle Impostazioni.</div>' +
+      '<div class="q" style="font-size:16px;margin-top:6px">Oppure fai l\'orario centrale?</div>' + chC('0730') + chC('0900') +
+      '<div class="muted small">Lavori part-time? Lo imposti dopo, nelle Impostazioni.</div></div>' +
       '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="stepn">2 di 2</div><div class="q">Importa la tua ultima busta paga</div>' +
       '<div class="muted">Scarica il PDF da EGO e aprilo qui. Ricavo paga, incentivi, ferie e ROL.</div>' + bustaOk +
       '<button class="btn dashed" id="onbPdf">' + IC.pdf + (ui.onbBusta ? 'Importa un\'altra busta' : 'Scegli il PDF della busta') + '</button></div>' +
@@ -172,10 +178,11 @@
       '<div class="muted small" style="text-align:center">Versione ' + VERSIONE + '</div></div>';
   }
   function bindOnb() {
-    document.querySelectorAll('[data-onbt]').forEach(function (b) { b.onclick = function () { ui.onbTurno = b.getAttribute('data-onbt'); render(); }; });
+    document.querySelectorAll('[data-onbt]').forEach(function (b) { b.onclick = function () { ui.onbTurno = b.getAttribute('data-onbt'); state.tipoOrario = 'turni'; render(); }; });
+    document.querySelectorAll('[data-onbc]').forEach(function (b) { b.onclick = function () { ui.onbTurno = 'C'; state.tipoOrario = 'centrale'; state.centrale = b.getAttribute('data-onbc'); render(); }; });
     $('#onbPdf').onclick = function () { scegliPdf(function (b) { ui.onbBusta = b.mese; render(); }); };
     function finish() {
-      if (ui.onbTurno) state.ancora = { settimana: C.key(C.monday(new Date())), turno: ui.onbTurno };
+      if (ui.onbTurno && ui.onbTurno !== 'C') state.ancora = { settimana: C.key(C.monday(new Date())), turno: ui.onbTurno };
       else if (!state.ancora) state.ancora = { settimana: C.key(C.monday(new Date())), turno: 'M' };
       if (ui.onbBusta) allinea(state.buste[ui.onbBusta]);
       state.inizio = C.key(oggi).slice(0, 7);
@@ -198,6 +205,11 @@
   }
 
   // ---- Turni ----
+  function tInfo(t) {
+    var T = Object.assign({}, C.TURNI[t] || { nome: 'Turno', orario: '', esteso: '' });
+    if (t === 'C') { var ci = C.infoC(state); T.orario = ci.orario; T.esteso = ci.esteso; }
+    return T;
+  }
   function infoTurno(g) {
     if (g.tipo !== 'lavoro') {
       if (g.tipo === 'libero') return { cls: 't-free', big: g.festa ? 'Festa' : 'Giorno libero', chips: [] };
@@ -206,13 +218,13 @@
       if (g.lavorate > 0) chips.push(ore(g.lavorate) + ' h lavorate');
       return { cls: 't-free', big: C.TIPI[g.tipo] + (g.ore && g.ore < 8 && g.tipo !== 'malattia' ? ' · ' + ore(g.ore) + ' h' : ''), chips: chips };
     }
-    var T = C.TURNI[g.turno] || { nome: 'Turno', orario: '' }, ch = [];
+    var T = tInfo(g.turno), ch = [];
     if (g.turno === 'N') ch.push('8 h di notte al 60,5%');
     else if (g.turno === 'P') ch.push('4 h al 27,5% (18–22)');
     else ch.push('Nessuna maggiorazione');
     ch.push('Buono pasto 9 €');
     if (g.straord) ch.push('+' + ore(g.straord) + ' h straordinario');
-    return { cls: 't-' + g.turno, big: T.nome + ' · ' + T.orario.replace(' – ', ':00 – ') + ':00', chips: ch };
+    return { cls: 't-' + g.turno, big: T.nome + ' · ' + T.esteso, chips: ch };
   }
 
   function bannerBusta() {
@@ -236,7 +248,7 @@
       var gd = C.giorno(state, d), cls = 'day', lab = '';
       if (gd.tipo === 'lavoro') { cls += ' t-' + gd.turno; lab = gd.turno; if (gd.turno === 'N') nN++; else nMP++; }
       else if (gd.tipo === 'libero') { cls += ' t-free'; }
-      else { cls += ' x-' + gd.tipo; lab = { ferie: 'F', rol: 'R', cig: 'CI', malattia: 'MA', congedo: 'CP', legge104: '104', corso: 'C', permesso: 'PP', chiusura: 'CA', festa: '' }[gd.tipo] || ''; if (gd.lavorate > 0 && gd.turno) lab += '·' + gd.turno; }
+      else { cls += ' x-' + gd.tipo; lab = { ferie: 'F', rol: 'R', cig: 'CI', malattia: 'MA', congedo: 'CP', legge104: '104', corso: 'C', permesso: 'PP', sciopero: 'SC', chiusura: 'CA', festa: '' }[gd.tipo] || ''; if (gd.lavorate > 0 && gd.turno) lab += '·' + gd.turno; }
       if (gd.tipo === 'libero') cls = 'day t-free';
       if (C.key(d) === C.key(oggi)) cls += ' today-ring';
       var dot = gd.straord ? '<i class="dot"></i>' : '';
@@ -255,7 +267,7 @@
       '<div class="grid7" style="margin-bottom:6px"><div class="wd">L</div><div class="wd">M</div><div class="wd">M</div><div class="wd">G</div><div class="wd">V</div><div class="wd">S</div><div class="wd">D</div></div>' +
       '<div class="grid7">' + cells + '</div>' +
       '<div class="legend"><span><i class="sw" style="background:var(--m-bg)"></i>M · 6–14</span><span><i class="sw" style="background:var(--p-bg)"></i>P · 14–22</span><span><i class="sw" style="background:var(--n-bg)"></i>N · 22–6</span>' +
-      '<span><i class="sw" style="background:#FDBA74"></i>Ferie</span><span><i class="sw" style="background:#FCA5A5"></i>Cassa int.</span><span><i class="sw" style="background:#DC2626;border-radius:6px;width:8px;height:8px"></i>Straord.</span></div></div>' +
+      (state.tipoOrario === 'centrale' ? '<span><i class="sw" style="background:var(--c-bg)"></i>C · ' + C.infoC(state).orario + '</span>' : '') + '<span><i class="sw" style="background:#FDBA74"></i>Ferie</span><span><i class="sw" style="background:#FCA5A5"></i>Cassa int.</span><span><i class="sw" style="background:#DC2626;border-radius:6px;width:8px;height:8px"></i>Straord.</span></div></div>' +
       '<button class="btn" data-day="' + C.key(oggi) + '">Segna un cambio turno o straordinario</button>' +
       '<div class="muted small" style="text-align:center">Tocca un giorno per segnare ferie, ROL, cassa integrazione, malattia o straordinari.</div>' +
       '</div>';
@@ -264,18 +276,18 @@
   // ---- Foglio del giorno ----
   function apriGiorno(k) {
     var d = C.parse(k), g = C.giorno(state, d), ov = Object.assign({}, state.giorni[k] || {});
-    var tipo = ov.tipo || g.tipo, oreV = ov.ore !== undefined ? ov.ore : 8, straord = ov.straord || 0;
+    var tipo = ov.tipo || g.tipo, oreV = ov.ore !== undefined ? ov.ore : (state.oreGiorno || 8), straord = ov.straord || 0;
     var wk = C.key(C.monday(d)), turnoSett = C.turno(state, d);
     var sc = document.createElement('div'); sc.className = 'scrim';
     function draw() {
-      var tipi = ['lavoro', 'ferie', 'rol', 'cig', 'malattia', 'congedo', 'legge104', 'permesso', 'chiusura', 'corso', 'festa'];
-      var nomi = { lavoro: 'Lavoro', ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integr.', malattia: 'Malattia', congedo: 'Congedo', legge104: 'Legge 104', corso: 'Corso', permesso: 'Permesso privato', chiusura: 'Chiusura aziendale', festa: 'Festa' };
+      var tipi = ['lavoro', 'ferie', 'rol', 'cig', 'malattia', 'congedo', 'legge104', 'permesso', 'sciopero', 'chiusura', 'corso', 'festa'];
+      var nomi = { lavoro: 'Lavoro', ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integr.', malattia: 'Malattia', congedo: 'Congedo', legge104: 'Legge 104', corso: 'Corso', permesso: 'Permesso privato', sciopero: 'Sciopero', chiusura: 'Chiusura aziendale', festa: 'Festa' };
       var weekend = g.weekend;
-      var showOre = ['ferie', 'rol', 'cig', 'corso', 'permesso', 'congedo', 'legge104'].indexOf(tipo) >= 0;
+      var showOre = ['ferie', 'rol', 'cig', 'corso', 'permesso', 'congedo', 'legge104', 'sciopero'].indexOf(tipo) >= 0;
       sc.innerHTML = '<div class="sheet" role="dialog" aria-label="Giorno"><div class="grab"></div>' +
         '<h2>' + cap(GG[d.getDay()]) + ' ' + d.getDate() + ' ' + MESI[d.getMonth()] + '</h2>' +
         '<div><div class="stepn" style="margin-bottom:8px">Turno di tutta la settimana</div><div class="seg">' +
-        ['M', 'P', 'N'].map(function (t) { return '<button class="opt t-' + t + (turnoSett === t ? ' on' : '') + '" data-wk="' + t + '">' + C.TURNI[t].nome + '</button>'; }).join('') + '</div></div>' +
+        ['M', 'P', 'N', 'C'].map(function (t) { return '<button class="opt t-' + t + (turnoSett === t ? ' on' : '') + '" data-wk="' + t + '">' + tInfo(t).nome + '</button>'; }).join('') + '</div></div>' +
         '<div><div class="stepn" style="margin-bottom:8px">Questo giorno</div><div class="opts">' +
         (weekend ? '<button class="opt' + (tipo === 'libero' ? ' on' : '') + '" data-tipo="libero">Libero</button>' : '') +
         tipi.filter(function (t) { return !weekend || t === 'lavoro' || t === 'corso'; }).map(function (t) { return '<button class="opt' + (tipo === t ? ' on' : '') + '" data-tipo="' + t + '">' + nomi[t] + '</button>'; }).join('') + '</div></div>' +
@@ -285,10 +297,11 @@
         (tipo === 'chiusura' ? '<div class="muted small">La chiusura aziendale viene pagata con le ferie: le ore vengono scalate dalle tue ferie.</div>' : '') +
         (tipo === 'legge104' ? '<div class="muted small">I permessi Legge 104 sono pagati come ore normali, ma in quelle ore non maturano gli incentivi.</div>' : '') +
         (tipo === 'permesso' ? '<div class="muted small">Il permesso privato non è pagato: le ore vengono tolte dalla paga.</div>' : '') +
+        (tipo === 'sciopero' ? '<div class="muted small">Le ore di sciopero non sono pagate: vengono tolte dalla paga, e in quelle ore non maturano incentivi e buono pasto.</div>' : '') +
         '<button class="btn" data-save="1">Salva</button><button class="btn secondary" data-close="1">Annulla</button></div>';
       sc.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { tipo = b.getAttribute('data-tipo'); draw(); }; });
       sc.querySelectorAll('[data-wk]').forEach(function (b) { b.onclick = function () { turnoSett = b.getAttribute('data-wk'); draw(); }; });
-      sc.querySelectorAll('[data-o]').forEach(function (b) { b.onclick = function () { oreV = Math.max(1, Math.min(8, oreV + +b.getAttribute('data-o'))); draw(); }; });
+      sc.querySelectorAll('[data-o]').forEach(function (b) { b.onclick = function () { oreV = Math.max(1, Math.min(state.oreGiorno || 8, oreV + +b.getAttribute('data-o'))); draw(); }; });
       sc.querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { straord = Math.max(0, Math.min(12, straord + +b.getAttribute('data-s'))); draw(); }; });
       sc.querySelector('[data-close]').onclick = function () { sc.remove(); };
       sc.querySelector('[data-save]').onclick = function () {
@@ -296,7 +309,7 @@
         var def = g.weekend ? 'libero' : g.festa ? 'festa' : 'lavoro';
         var nv = {};
         if (tipo !== def) nv.tipo = tipo;
-        if (showOre && oreV !== 8) nv.ore = oreV;
+        if (showOre && oreV !== (state.oreGiorno || 8)) nv.ore = oreV;
         if (straord) nv.straord = straord;
         if (Object.keys(nv).length) state.giorni[k] = nv; else delete state.giorni[k];
         save(); sc.remove(); render();
@@ -327,7 +340,9 @@
       righe = b.voci.filter(function (v) { return v.comp; }).map(function (v) { var sp = B.spiega(v, b); return { voce: sp.titolo, importo: v.comp }; });
       lordo = b.totComp; netto = b.netto; nettoSub = 'Netto in busta · trattenute ' + eur(b.totTratt);
     } else {
-      stat = '<div class="status info"><div class="ic">' + IC.info + '</div><div><b>Stima del mese</b><span>Calcolata dai tuoi turni. Quando arriva la busta di ' + MESI[m - 1] + ', importala per il controllo.</span></div></div>';
+      stat = '<div class="status warn"><div class="ic">' + IC.info + '</div><div><b>Questa è una STIMA di ' + MESI[m - 1] + ', non la busta</b><span>Calcolata dai tuoi turni. Quando arriva la busta di ' + MESI[m - 1] + ', importala: qui vedrai le cifre vere e il controllo.</span></div></div>';
+      var ubm = C.ultimaBusta(state);
+      if (ubm) stat += '<button class="btn secondary" data-act="vaiMese" data-k="' + ubm.mese + '">Vai alla busta di ' + MESI[+ubm.mese.slice(5, 7) - 1] + '</button>';
       righe = s.righe; lordo = s.lordo; netto = s.netto; nettoSub = 'Netto stimato (indicativo)';
     }
     var tiles = '<div class="tiles"><div class="tile"><b>' + ore(o.lavorate) + '</b><span>ore lavorate</span></div><div class="tile night"><b>' + ore(o.notte + o.pom) + '</b><span>ore magg.</span></div>' +
@@ -414,8 +429,17 @@
     var ordTxt = state.ordine.map(function (t) { return C.TURNI[t].nome; }).join(' → ');
     var turnoOra = C.turno(state, oggi);
     return '<div class="screen settings"><div class="topbar"><div><div class="kicker">PagaGiusta ' + VERSIONE + '</div><h1>Impostazioni</h1></div><button class="iconbtn" data-act="tabTurni" aria-label="Indietro">' + IC.left + '</button></div>' +
-      '<div class="card"><h3>Turno di questa settimana</h3><div class="seg">' + ['M', 'P', 'N'].map(function (t) { return '<button class="opt t-' + t + (turnoOra === t ? ' on' : '') + '" data-anc="' + t + '">' + C.TURNI[t].nome + '</button>'; }).join('') + '</div>' +
-      '<div class="muted small" style="margin-top:10px">Da qui l\'app calcola tutte le settimane, avanti e indietro. Le settimane che hai cambiato a mano restano come le hai segnate.</div></div>' +
+      '<div class="card"><h3>Il tuo orario</h3><select id="tipoOrario" style="width:100%">' +
+      '<option value="turni"' + (state.tipoOrario !== 'centrale' ? ' selected' : '') + '>Turni a rotazione (mattina, pomeriggio, notte)</option>' +
+      '<option value="0730"' + (state.tipoOrario === 'centrale' && (state.centrale || '0730') === '0730' ? ' selected' : '') + '>Orario centrale 7:30 – 16:00</option>' +
+      '<option value="0900"' + (state.tipoOrario === 'centrale' && state.centrale === '0900' ? ' selected' : '') + '>Orario centrale 9:00 – 17:30</option></select></div>' +
+      '<div class="card"><h3>Part-time</h3><select id="oreGiorno" style="width:100%">' +
+      [8, 7, 6, 5, 4].map(function (h) { return '<option value="' + h + '"' + ((state.oreGiorno || 8) === h ? ' selected' : '') + '>' + (h === 8 ? 'No, tempo pieno (8 ore al giorno)' : 'Sì, ' + h + ' ore al giorno') + '</option>'; }).join('') + '</select>' +
+      '<div class="stepn" style="margin:12px 0 8px">Giorni in cui lavori</div><div class="grid7">' +
+      [[1, 'L'], [2, 'M'], [3, 'M'], [4, 'G'], [5, 'V'], [6, 'S'], [0, 'D']].map(function (x) { var on = (state.giorniLav || [1, 2, 3, 4, 5]).indexOf(x[0]) >= 0; return '<button class="opt' + (on ? ' on' : '') + '" data-gl="' + x[0] + '" style="min-height:44px;padding:0">' + x[1] + '</button>'; }).join('') + '</div>' +
+      '<div class="muted small" style="margin-top:10px">Per il part-time verticale togli i giorni in cui non lavori. La paga base viene presa dalla tua busta.</div></div>' +
+      (state.tipoOrario === 'centrale' ? '' : '<div class="card"><h3>Turno di questa settimana</h3><div class="seg">' + ['M', 'P', 'N'].map(function (t) { return '<button class="opt t-' + t + (turnoOra === t ? ' on' : '') + '" data-anc="' + t + '">' + C.TURNI[t].nome + '</button>'; }).join('') + '</div>' +
+      '<div class="muted small" style="margin-top:10px">Da qui l\'app calcola tutte le settimane, avanti e indietro. Le settimane che hai cambiato a mano restano come le hai segnate.</div></div>') +
       '<div class="card list"><div class="li"><span>Ordine dei turni<span class="sub">' + ordTxt + '</span></span><select id="ordine"><option value="NPM"' + (state.ordine.join('') === 'NPM' ? ' selected' : '') + '>Notte → Pom. → Mattina</option><option value="MPN"' + (state.ordine.join('') === 'MPN' ? ' selected' : '') + '>Mattina → Pom. → Notte</option></select></div>' +
       '<div class="li"><span>Valore buono pasto</span><select id="buono">' + [5, 6, 7, 8, 9, 10].map(function (v) { return '<option value="' + v + '"' + (+state.buono === v ? ' selected' : '') + '>' + v + ' €</option>'; }).join('') + '</select></div>' +
       '<div class="li"><span>Tema</span><select id="tema"><option value="auto"' + (state.tema === 'auto' ? ' selected' : '') + '>Come il telefono</option><option value="light"' + (state.tema === 'light' ? ' selected' : '') + '>Chiaro</option><option value="dark"' + (state.tema === 'dark' ? ' selected' : '') + '>Scuro</option></select></div></div>' +
@@ -427,16 +451,35 @@
       '<button class="btn secondary" style="margin-top:10px" data-act="novita">Rivedi le novità</button></div>' +
       (IS_WEB && !standalone() ? '<button class="btn secondary" data-act="guidaHome">Aggiungi alla schermata Home</button>' : '') +
       '<button class="btn danger" data-act="wipe">Cancella tutti i miei dati</button>' +
-      '<div class="muted small" style="text-align:center">PagaGiusta ' + VERSIONE + ' · funziona senza internet</div></div>';
+      '<div class="muted small" style="text-align:center">PagaGiusta ' + VERSIONE + ' · i tuoi dati restano sul telefono</div></div>';
   }
 
   // ---------- eventi ----------
   function bind() {
-    document.querySelectorAll('[data-tab]').forEach(function (b) { b.onclick = function () { ui.tab = b.getAttribute('data-tab'); if (ui.tab === 'busta') ui.bustaSel = null; render(); }; });
+    document.querySelectorAll('[data-tab]').forEach(function (b) {
+      b.onclick = function () {
+        var t = b.getAttribute('data-tab');
+        if (t === 'mese' && ui.tab !== 'mese') { var ub = C.ultimaBusta(state); if (ub) { ui.meseY = +ub.mese.slice(0, 4); ui.meseM = +ub.mese.slice(5, 7); } else { ui.meseY = oggi.getFullYear(); ui.meseM = oggi.getMonth() + 1; } }
+        ui.tab = t; if (ui.tab === 'busta') ui.bustaSel = null; render();
+      };
+    });
     document.querySelectorAll('[data-day]').forEach(function (b) { b.onclick = function () { apriGiorno(b.getAttribute('data-day')); }; });
     document.querySelectorAll('[data-busta]').forEach(function (b) { b.onclick = function () { ui.bustaSel = b.getAttribute('data-busta'); render(); }; });
     document.querySelectorAll('[data-anc]').forEach(function (b) {
       b.onclick = function () { state.ancora = { settimana: C.key(C.monday(oggi)), turno: b.getAttribute('data-anc') }; delete state.settimane[C.key(C.monday(oggi))]; save(); render(); toast('Turni aggiornati'); };
+    });
+    var to = $('#tipoOrario'); if (to) to.onchange = function () {
+      if (to.value === 'turni') state.tipoOrario = 'turni'; else { state.tipoOrario = 'centrale'; state.centrale = to.value; }
+      if (state.tipoOrario === 'turni' && !state.ancora) state.ancora = { settimana: C.key(C.monday(oggi)), turno: 'M' };
+      save(); render(); toast('Orario aggiornato');
+    };
+    var og = $('#oreGiorno'); if (og) og.onchange = function () { state.oreGiorno = +og.value; save(); render(); toast('Orario aggiornato'); };
+    document.querySelectorAll('[data-gl]').forEach(function (b) {
+      b.onclick = function () {
+        var d = +b.getAttribute('data-gl'), gl = (state.giorniLav || [1, 2, 3, 4, 5]).slice(), i = gl.indexOf(d);
+        if (i >= 0) { if (gl.length === 1) { toast('Serve almeno un giorno'); return; } gl.splice(i, 1); } else gl.push(d);
+        state.giorniLav = gl; save(); render();
+      };
     });
     var o = $('#ordine'); if (o) o.onchange = function () { state.ordine = o.value.split(''); save(); render(); };
     var bu = $('#buono'); if (bu) bu.onchange = function () { state.buono = +bu.value; save(); toast('Salvato'); };
@@ -538,12 +581,16 @@
   }
 
   // ---------- Tutorial delle novità (dopo ogni aggiornamento) ----------
-  var NOVITA_ID = '1.0-beta-9';
+  var NOVITA_ID = '1.0-beta-11';
   var NOVITA = [
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 17h6"/></svg>',
-      t: 'Legge 104, permessi privati e chiusure', d: 'Toccando un giorno del calendario ora puoi segnare anche i permessi Legge 104 (pagati), i permessi privati (non pagati) e le chiusure aziendali (scalate dalle ferie). L\'app ne tiene conto nei calcoli del mese.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      t: 'Orario centrale', d: 'Chi fa l\'orario centrale (7:30 – 16:00 oppure 9:00 – 17:30) ora può impostarlo: dalle Impostazioni, in "Il tuo orario". Si può anche segnare una singola settimana di orario centrale toccando un giorno del calendario.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9h-9z"/></svg>',
+      t: 'Part-time', d: 'Chi lavora part-time ora può impostare le ore al giorno (da 4 a 7) e i giorni in cui lavora, dalle Impostazioni. Calendario, stime e controlli si adattano da soli.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V4M4 4h11l-2 4 2 4H4"/></svg>',
+      t: 'Sciopero', d: 'Toccando un giorno del calendario ora puoi segnare anche lo sciopero, a giornata intera o a ore. Le ore di sciopero non sono pagate e l\'app le toglie dalla stima del mese.' },
     { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
-      t: 'Trattenute stimate', d: 'Nella stima del mese in corso ora vedi anche le trattenute: contributi INPS, quota sindacale (se nella tua busta c\'è), fondo Cometa e tasse. Le percentuali vengono prese dalla tua ultima busta.' }
+      t: 'Il mese giusto, subito', d: 'La sezione Mese ora si apre sull\'ultima busta che hai importato, con le cifre vere della busta. La stima del mese in corso è segnata chiaramente come STIMA.' }
   ];
   function mostraNovita(forza) {
     if (!forza && (!state.onboarded || state.novitaViste === NOVITA_ID)) return;

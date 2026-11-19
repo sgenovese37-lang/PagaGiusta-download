@@ -239,3 +239,9 @@ select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px soli
 
 /* input file invisibili ma NON display:none (su iPhone serve per aprire la scelta del file) */
 .fileinp { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
+:root { --c-bg: #BBF7D0; --c-tx: #14532D; }
+.t-C, .opt.t-C, .choice.t-C { background: var(--c-bg); color: var(--c-tx); border-color: transparent; }
+.t-C .chip { background: rgba(20, 83, 45, .1); }
+.day.x-sciopero { background: #E5E7EB; color: #111827; box-shadow: inset 0 0 0 2px #DC2626; }
+.seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.settings .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }

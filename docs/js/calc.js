@@ -15,14 +15,17 @@
   };
 
   var TURNI = {
-    M: { nome: 'Mattina', orario: '6 – 14', breve: 'M' },
-    P: { nome: 'Pomeriggio', orario: '14 – 22', breve: 'P' },
-    N: { nome: 'Notte', orario: '22 – 6', breve: 'N' }
+    M: { nome: 'Mattina', orario: '6 – 14', esteso: '6:00 – 14:00', breve: 'M' },
+    P: { nome: 'Pomeriggio', orario: '14 – 22', esteso: '14:00 – 22:00', breve: 'P' },
+    N: { nome: 'Notte', orario: '22 – 6', esteso: '22:00 – 6:00', breve: 'N' },
+    C: { nome: 'Centrale', orario: '7:30 – 16', esteso: '7:30 – 16:00', breve: 'C' }
   };
+  var CENTRALI = { '0730': { orario: '7:30 – 16', esteso: '7:30 – 16:00' }, '0900': { orario: '9 – 17:30', esteso: '9:00 – 17:30' } };
+  function infoC(state) { return CENTRALI[(state && state.centrale) || '0730'] || CENTRALI['0730']; }
 
   var TIPI = {
     lavoro: 'Lavoro', ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integrazione', malattia: 'Malattia',
-    congedo: 'Congedo parentale', legge104: 'Permesso Legge 104', corso: 'Corso', permesso: 'Permesso privato',
+    congedo: 'Congedo parentale', legge104: 'Permesso Legge 104', sciopero: 'Sciopero', corso: 'Corso', permesso: 'Permesso privato',
     chiusura: 'Chiusura aziendale', festa: 'Festa'
   };
 
@@ -54,6 +57,7 @@
   function turno(state, d) {
     var wk = key(monday(d));
     if (state.settimane && state.settimane[wk]) return state.settimane[wk];
+    if (state.tipoOrario === 'centrale') return 'C';
     var a = state.ancora; if (!a) return null;
     var ord = state.ordine || ['N', 'P', 'M'];
     var i0 = ord.indexOf(a.turno), w = weeksBetween(parse(a.settimana), d);
@@ -62,25 +66,29 @@
 
   // Descrizione completa di un giorno
   function giorno(state, d) {
-    var k = key(d), wd = d.getDay(), weekend = wd === 0 || wd === 6, festa = isFesta(d);
+    var k = key(d), wd = d.getDay(), festa = isFesta(d);
+    var gl = state.giorniLav || [1, 2, 3, 4, 5], oreG = state.oreGiorno || 8;
+    var weekend = gl.indexOf(wd) < 0; // giorno non lavorativo (sabato, domenica o giorno libero del part-time)
     var ov = (state.giorni && state.giorni[k]) || {};
     var t = turno(state, d);
     var tipo = ov.tipo || (weekend ? 'libero' : festa ? 'festa' : 'lavoro');
-    var ore = ov.ore !== undefined ? ov.ore : 8;
+    var ore = ov.ore !== undefined ? Math.min(ov.ore, oreG) : oreG;
     var g = { key: k, data: d, turno: t, tipo: tipo, festa: festa, weekend: weekend, straord: ov.straord || 0, ore: ore, nota: ov.nota || '' };
     // ore lavorate e assenze
-    g.lavorate = 0; g.ferie = 0; g.rol = 0; g.cig = 0; g.corso = 0; g.assenza = 0; g.congedo = 0; g.malattia = 0; g.l104 = 0;
-    if (tipo === 'lavoro') g.lavorate = 8;
-    else if (tipo === 'ferie') { g.ferie = Math.min(8, ore); g.lavorate = 8 - g.ferie; }
-    else if (tipo === 'rol') { g.rol = Math.min(8, ore); g.lavorate = 8 - g.rol; }
-    else if (tipo === 'cig') { g.cig = Math.min(8, ore); g.lavorate = 8 - g.cig; }
-    else if (tipo === 'corso') { g.corso = Math.min(8, ore); g.lavorate = 8 - g.corso; }
-    else if (tipo === 'permesso') { g.assenza = Math.min(8, ore); g.lavorate = 8 - g.assenza; }
-    else if (tipo === 'congedo') { g.congedo = Math.min(8, ore); g.lavorate = 8 - g.congedo; }
-    else if (tipo === 'malattia') { g.malattia = 8; }
-    else if (tipo === 'legge104') { g.l104 = Math.min(8, ore); g.lavorate = 8 - g.l104; }
-    else if (tipo === 'chiusura') { g.ferie = 8; g.chiusura = true; }
-    if (weekend && tipo === 'libero') g.lavorate = 0;
+    g.lavorate = 0; g.ferie = 0; g.rol = 0; g.cig = 0; g.corso = 0; g.assenza = 0; g.congedo = 0; g.malattia = 0; g.l104 = 0; g.sciopero = 0;
+    if (tipo === 'lavoro') g.lavorate = oreG;
+    else if (tipo === 'ferie') { g.ferie = ore; g.lavorate = oreG - g.ferie; }
+    else if (tipo === 'rol') { g.rol = ore; g.lavorate = oreG - g.rol; }
+    else if (tipo === 'cig') { g.cig = ore; g.lavorate = oreG - g.cig; }
+    else if (tipo === 'corso') { g.corso = ore; g.lavorate = oreG - g.corso; }
+    else if (tipo === 'permesso') { g.assenza = ore; g.lavorate = oreG - g.assenza; }
+    else if (tipo === 'congedo') { g.congedo = ore; g.lavorate = oreG - g.congedo; }
+    else if (tipo === 'malattia') { g.malattia = oreG; }
+    else if (tipo === 'legge104') { g.l104 = ore; g.lavorate = oreG - g.l104; }
+    else if (tipo === 'chiusura') { g.ferie = oreG; g.chiusura = true; }
+    else if (tipo === 'sciopero') { g.sciopero = ore; g.lavorate = oreG - g.sciopero; }
+    if (tipo === 'libero') g.lavorate = 0;
+    g.oreGiorno = oreG;
     // maggiorazioni
     g.pom = 0; g.notte = 0;
     if (g.lavorate > 0 && t === 'P') g.pom = Math.max(0, Math.min(REGOLE.pomOre, g.lavorate - 4));
@@ -99,7 +107,8 @@
   function parametri(state) {
     var b = ultimaBusta(state), p = {};
     p.pagaOraria = (b && b.pagaOraria) || state.pagaOraria || null;
-    p.retribuzione = (b && b.retribuzioneMensile) || (p.pagaOraria ? p.pagaOraria * 173 : null);
+    var v300 = b && b.voci.find(function (v) { return v.code === '300' && v.comp; });
+    p.retribuzione = (v300 && v300.comp) || (b && b.retribuzioneMensile) || (p.pagaOraria ? p.pagaOraria * 173 * ((state.oreGiorno || 8) / 8) : null);
     p.incentivi = Object.assign({}, REGOLE.incentivi, (b && b.incentivi) || {});
     p.buono = state.buono || REGOLE.buono;
     p.rapportoNetto = b && b.netto && b.totComp ? b.netto / b.totComp : 0.75;
@@ -121,15 +130,16 @@
   // Stima del mese dal calendario
   function stimaMese(state, y, m) {
     var p = parametri(state), po = p.pagaOraria || 0;
-    var s = { y: y, m: m, giorni: [], ore: { lavorate: 0, pom: 0, notte: 0, ferie: 0, rol: 0, cig: 0, corsi: 0, straord: 0, straordN: 0, festivita: 0, assenze: 0, congedo: 0, malattia: 0, l104: 0, chiusura: 0 }, buoni: 0 };
+    var s = { y: y, m: m, giorni: [], ore: { lavorate: 0, pom: 0, notte: 0, ferie: 0, rol: 0, cig: 0, corsi: 0, straord: 0, straordN: 0, festivita: 0, assenze: 0, congedo: 0, malattia: 0, l104: 0, chiusura: 0, sciopero: 0 }, buoni: 0 };
     giorniMese(y, m).forEach(function (d) {
       var g = giorno(state, d); s.giorni.push(g);
       var o = s.ore;
       o.lavorate += g.lavorate; o.pom += g.pom; o.notte += g.notte; o.ferie += g.ferie; o.rol += g.rol; o.cig += g.cig;
       o.corsi += g.corso; o.assenze += g.assenza; o.congedo += g.congedo; o.malattia += g.malattia; o.l104 += g.l104;
-      if (g.chiusura) o.chiusura += 8;
+      if (g.chiusura) o.chiusura += g.oreGiorno;
+      o.sciopero += g.sciopero;
       if (g.straord) { o.straord += g.straord; if (g.turno === 'N') o.straordN += g.straord; }
-      if (g.festa && d.getDay() === 0) o.festivita += REGOLE.festDomOre;
+      if (g.festa && d.getDay() === 0) o.festivita += REGOLE.festDomOre * ((state.oreGiorno || 8) / 8);
       s.buoni += g.buono;
     });
     var o = s.ore, cigOra = REGOLE.cigOraria[y] || REGOLE.cigOraria[2026];
@@ -146,6 +156,7 @@
     if (o.cig) r.push({ voce: 'Cassa integrazione · ' + fmtOre(o.cig) + ' h', importo: o.cig * cigOra - o.cig * po, nota: o.cig + ' h × ' + cigOra.toString().replace('.', ',') + ' € al posto della paga' });
     if (o.congedo) r.push({ voce: 'Congedo parentale · ' + fmtOre(o.congedo) + ' h (stima)', importo: o.congedo * po * (p.congedoPct - 1), stima: true });
     if (o.assenze) r.push({ voce: 'Permessi privati · ' + fmtOre(o.assenze) + ' h (non pagati)', importo: -o.assenze * po, stima: true });
+    if (o.sciopero) r.push({ voce: 'Sciopero · ' + fmtOre(o.sciopero) + ' h (non pagate)', importo: -o.sciopero * po });
     if (o.l104) r.push({ voce: 'Permessi Legge 104 · ' + fmtOre(o.l104) + ' h', importo: 0, nota: 'Pagati come ore normali (l\'azienda li anticipa per l\'INPS), ma senza incentivi' });
     if (o.chiusura) r.push({ voce: 'Chiusura aziendale · ' + fmtOre(o.chiusura) + ' h', importo: 0, nota: 'Pagata con le ferie: le ore vengono scalate dalle tue ferie' });
     s.righe = r;
@@ -207,6 +218,7 @@
     for (var wk in votiSett) {
       var v = votiSett[wk], best = null, bv = 0;
       ['N', 'P', 'M'].forEach(function (t) { if (v[t] > bv) { bv = v[t]; best = t; } });
+      if (best === 'M' && state.tipoOrario === 'centrale') best = 'C';
       if (best) out.settimane[wk] = best;
     }
     return out;
@@ -250,7 +262,7 @@
   function fmtOre(v) { return root.PGBusta ? root.PGBusta.ore(v) : String(Math.round(v * 100) / 100); }
 
   root.PGCalc = {
-    REGOLE: REGOLE, TURNI: TURNI, TIPI: TIPI, key: key, parse: parse, monday: monday, turno: turno, giorno: giorno,
+    REGOLE: REGOLE, TURNI: TURNI, TIPI: TIPI, CENTRALI: CENTRALI, infoC: infoC, key: key, parse: parse, monday: monday, turno: turno, giorno: giorno,
     giorniMese: giorniMese, stimaMese: stimaMese, confronta: confronta, giorniDaBusta: giorniDaBusta,
     ferieRol: ferieRol, tredicesima: tredicesima, giornoBusta: giornoBusta, isFesta: isFesta, parametri: parametri,
     ultimaBusta: ultimaBusta, fmtOre: fmtOre

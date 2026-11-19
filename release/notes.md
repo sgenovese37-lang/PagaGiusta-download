@@ -1,2 +1,5 @@
-- Nuovi giorni da segnare: Legge 104, permesso privato, chiusura aziendale
-- Trattenute stimate del mese: INPS, quota sindacale, Cometa e tasse
+- Orario centrale (7:30-16:00 o 9:00-17:30)
+- Part-time: ore al giorno e giorni di lavoro
+- Nuovo giorno da segnare: sciopero
+- La sezione Mese si apre sull'ultima busta importata
+- La stima del mese in corso è segnata chiaramente come STIMA
