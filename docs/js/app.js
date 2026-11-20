@@ -89,6 +89,7 @@
       save();
       if (cb) cb(b); else { ui.tab = 'busta'; ui.bustaSel = b.mese; render(); }
       toast('Busta di ' + meseKeyLabel(b.mese).toLowerCase() + ' letta');
+      if (state.onboarded && !state.guidaControlloVista && C.ultimaBusta(state) === b) guidaControllo(b.mese);
     }).catch(function (e) {
       erroreBusta(e, bytes);
     });
@@ -171,7 +172,7 @@
       '<div class="q" style="font-size:16px;margin-top:6px">Oppure fai l\'orario centrale?</div>' + chC('0730') + chC('0900') +
       '<div class="muted small">Lavori part-time? Lo imposti dopo, nelle Impostazioni.</div></div>' +
       '<div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="stepn">2 di 2</div><div class="q">Importa la tua ultima busta paga</div>' +
-      '<div class="muted">Scarica il PDF da EGO e aprilo qui. Ricavo paga, incentivi, ferie e ROL.</div>' + bustaOk +
+      '<div class="muted">Su EGO scarica il PDF della tua <b>ultima busta paga</b> e caricalo qui. L\'app parte da quella busta: ricava paga oraria, incentivi, ferie e ROL.</div>' + bustaOk +
       '<button class="btn dashed" id="onbPdf">' + IC.pdf + (ui.onbBusta ? 'Importa un\'altra busta' : 'Scegli il PDF della busta') + '</button></div>' +
       '<button class="btn" id="onbGo">Inizia</button>' +
       '<div style="text-align:center"><button class="linkbtn" id="onbSkip">Salta, lo faccio dopo</button></div>' +
@@ -189,9 +190,31 @@
       state.novitaViste = NOVITA_ID;
       state.onboarded = true; save(); ui.tab = 'turni'; render();
       if (!ui.onbTurno) toast('Imposta il turno di questa settimana dalle Impostazioni');
+      if (ui.onbBusta) guidaControllo(ui.onbBusta);
     }
     $('#onbGo').onclick = function () { if (!ui.onbTurno) { toast('Scegli il turno di questa settimana'); return; } finish(); };
     $('#onbSkip').onclick = finish;
+  }
+
+  // Dopo la prima busta: spiega quali giorni controllare per il prossimo controllo
+  function guidaControllo(mk) {
+    var y = +mk.slice(0, 4), m = +mk.slice(5, 7), ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+    var nomeB = MESI[m - 1], nomeN = MESI[nm - 1];
+    var inCorso = new Date(ny, nm - 1, 1) <= oggi;
+    var el = document.createElement('div'); el.className = 'nv';
+    el.innerHTML = '<div class="box" role="dialog" aria-label="Ultimo passo"><div class="top"><span>Ultimo passo</span></div>' +
+      '<div class="ill"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M9 15l2 2 4-4"/></svg></div>' +
+      '<h2>Controlla i giorni di ' + nomeN + '</h2>' +
+      '<p>La busta di <b>' + nomeB + '</b> è caricata: ' + nomeB + ' è già controllato e chiuso. La prossima busta sarà quella di <b>' + nomeN + '</b>.</p>' +
+      '<p>' + (inCorso ? 'Nel calendario controlla tutti i giorni dal <b>1° ' + nomeN + ' a oggi</b>, anche quelli prima che arrivasse la busta, e segna ' : 'Durante ' + nomeN + ' segna nel calendario ') +
+      'ferie, ROL, cassa integrazione, malattia, cambi turno e straordinari. Così il controllo con la prossima busta sarà giusto.</p>' +
+      (inCorso ? '<p class="small" style="font-size:13px;color:var(--tx2)">I giorni che verranno potrai segnarli man mano.</p>' : '') +
+      '<button class="btn" data-g="vai">' + (inCorso ? 'Vai a ' + nomeN : 'Ho capito') + '</button></div>';
+    el.querySelector('[data-g]').onclick = function () {
+      state.guidaControlloVista = true; save(); el.remove();
+      ui.tab = 'turni'; ui.calY = ny; ui.calM = nm; render();
+    };
+    document.body.appendChild(el);
   }
 
   function allinea(b) {
@@ -642,24 +665,22 @@
     return 'Importa la tua prima busta';
   }
   function gearSvg(cls, col) {
-    return '<svg class="gear ' + cls + '" viewBox="0 0 100 100" aria-hidden="true"><path fill="' + col + '" d="M43 4h14l2 12a36 36 0 0 1 9 4l10-7 10 10-7 10a36 36 0 0 1 4 9l12 2v14l-12 2a36 36 0 0 1-4 9l7 10-10 10-10-7a36 36 0 0 1-9 4l-2 12H43l-2-12a36 36 0 0 1-9-4l-10 7-10-10 7-10a36 36 0 0 1-4-9L3 57V43l12-2a36 36 0 0 1 4-9l-7-10 10-10 10 7a36 36 0 0 1 9-4z"/><circle cx="50" cy="50" r="15" fill="#0F766E"/></svg>';
+    return '<svg class="gear ' + cls + '" viewBox="0 0 100 100" aria-hidden="true"><path fill="' + col + '" d="M43 4h14l2 12a36 36 0 0 1 9 4l10-7 10 10-7 10a36 36 0 0 1 4 9l12 2v14l-12 2a36 36 0 0 1-4 9l7 10-10 10-10-7a36 36 0 0 1-9 4l-2 12H43l-2-12a36 36 0 0 1-9-4l-10 7-10-10 7-10a36 36 0 0 1-4-9L3 57V43l12-2a36 36 0 0 1 4-9l-7-10 10-10 10 7a36 36 0 0 1 9-4z"/><circle cx="50" cy="50" r="15" fill="#475569"/></svg>';
   }
   function splash() {
     try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { mostraBenvenuto(); mostraNovita(); return; } } catch (e) { }
-    var st = rigaStato();
     var el = document.createElement('div'); el.className = 'sp'; el.setAttribute('aria-hidden', 'true');
-    el.innerHTML = '<div class="stage"><div class="gears">' + gearSvg('g1', '#CBD5E1') + gearSvg('g2', '#E8A27C') + gearSvg('g3', '#94A3B8') + '</div>' +
-      '<div class="belt"></div>' +
-      '<div class="doc"><div class="ln t"></div><div class="ln s"></div><div class="ln"></div><div class="ln m"></div><div class="ln s"></div><div class="tot">€ ✓</div></div>' +
-      '<div class="coin c1">€</div><div class="coin c2">€</div><div class="coin c3">€</div><div class="spark"></div>' +
+    el.innerHTML = '<div class="stage"><div class="machine"><i class="led"></i></div>' + gearSvg('g1', '#94A3B8') + gearSvg('g2', '#E8A27C') + gearSvg('g3', '#CBD5E1') +
+      '<div class="belt"></div><div class="slot"><div class="doc"><div class="ln t"></div><div class="ln s"></div><div class="ln"></div><div class="ln m"></div><div class="ln s"></div><div class="tot">€ ✓</div></div></div>' +
+      '<div class="stamp"><i>✓</i>GIUSTA</div><div class="coin c1">€</div><div class="coin c2">€</div><div class="coin c3">€</div>' +
       '<svg class="logo" viewBox="0 0 200 200"><rect width="200" height="200" rx="46" fill="#0B5D57" stroke="#14B8A6" stroke-width="3"/><g fill="none" stroke-width="18" stroke-linecap="round" transform="rotate(-90 100 100)"><circle class="ring r1" cx="100" cy="100" r="58" stroke="#FCD34D" transform="rotate(8 100 100)"/><circle class="ring r2" cx="100" cy="100" r="58" stroke="#93C5FD" transform="rotate(128 100 100)"/><circle class="ring r3" cx="100" cy="100" r="58" stroke="#C7D2FE" transform="rotate(248 100 100)"/></g><path class="chk" d="M76 102l16 16 32-34" fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
-      '<div class="wm"><b>Paga<span>Giusta</span></b><div class="tag">La tua busta paga, finalmente chiara.</div>' + (st ? '<div class="st">' + esc(st) + '</div>' : '') + '</div>' +
+      '<div class="wm"><b>Paga<span>Giusta</span></b><div class="tag">La tua busta paga, finalmente chiara.</div></div>' +
       '</div><div class="skip">Tocca per saltare</div>';
     document.body.appendChild(el);
     var done = false;
     function chiudi() { if (done) return; done = true; el.classList.add('bye'); setTimeout(function () { el.remove(); mostraBenvenuto(); mostraNovita(); }, 400); }
     el.addEventListener('click', chiudi);
-    setTimeout(chiudi, st ? 4100 : 3600);
+    setTimeout(chiudi, 3700);
   }
 
   // ---------- Tutorial delle novità (dopo ogni aggiornamento) ----------
