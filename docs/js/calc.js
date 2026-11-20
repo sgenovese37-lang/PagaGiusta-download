@@ -224,18 +224,59 @@
     return s;
   }
 
+  // Quanto vale in euro una differenza di ore (busta − calendario): positivo = in busta ti pagano di più
+  function euroDifferenza(state, row, y) {
+    var p = parametri(state), po = p.pagaOraria || 0, cigOra = REGOLE.cigOraria[y] || REGOLE.cigOraria[2026];
+    var inc = (p.incentivi['368'] || 0) + (p.incentivi['369'] || 0) + (p.incentivi['390'] || 0);
+    var perOra = { lavorate: inc, notte: po * REGOLE.nottePct / 100, pom: po * REGOLE.pomPct / 100, cig: cigOra - po, straord: po * REGOLE.straordDPct / 100 + (p.incentivi['390'] || 0), festivita: po, ferie: 0, corsi: 0 }[row.id] || 0;
+    return (row.busta - row.cal) * perOra;
+  }
+
+  // Giorni in cui il calendario e la busta non dicono la stessa cosa
+  function giorniDiversi(state, busta) {
+    var y = +busta.mese.slice(0, 4), m = +busta.mese.slice(5, 7), al = giorniDaBusta(state, busta);
+    var sb = Object.assign({}, state, { giorni: Object.assign({}, state.giorni), settimane: Object.assign({}, state.settimane) });
+    Object.keys(sb.giorni).forEach(function (k) { if (k.slice(0, 7) === busta.mese) delete sb.giorni[k]; });
+    Object.assign(sb.giorni, al.giorni); Object.assign(sb.settimane, al.settimane);
+    var out = [];
+    giorniMese(y, m).forEach(function (d) {
+      var wd = d.getDay(); if (wd === 0 || wd === 6) return;
+      var a = giorno(state, d), b = giorno(sb, d);
+      var diverso = a.tipo !== b.tipo || (a.tipo === 'lavoro' && b.tipo === 'lavoro' && a.turno !== b.turno) ||
+        Math.abs(a.lavorate - b.lavorate) > 0.4 || Math.abs((a.straord || 0) - (b.straord || 0)) > 0.4;
+      if (diverso) out.push({ key: key(d), data: d, cal: a, busta: b });
+    });
+    return out;
+  }
+
+  // Simulazione di ferie o ROL tra due date
+  function simulaFerie(state, dal, al, tipo, oggi) {
+    var fr = ferieRol(state, oggi); if (!fr) return null;
+    var d0 = parse(dal), d1 = parse(al); if (d1 < d0) { var t = d0; d0 = d1; d1 = t; }
+    var giorni = 0, oreTot = 0, giaSegnate = 0, d = new Date(d0), n = 0;
+    while (d <= d1 && n < 400) {
+      var g = giorno(state, d);
+      if (!g.weekend && !g.festa) { giorni++; oreTot += g.oreGiorno; if (g.tipo === tipo) giaSegnate += tipo === 'ferie' ? g.ferie : g.rol; }
+      d.setDate(d.getDate() + 1); n++;
+    }
+    var mesi = Math.max(0, (d0.getFullYear() * 12 + d0.getMonth()) - (oggi.getFullYear() * 12 + oggi.getMonth()));
+    var disp = (tipo === 'ferie' ? fr.ferie + mesi * fr.ferieMese : fr.rol + mesi * fr.rolMese) + giaSegnate;
+    var altro = tipo === 'ferie' ? fr.rol + mesi * fr.rolMese : fr.ferie + mesi * fr.ferieMese;
+    return { giorni: giorni, ore: oreTot, disponibili: disp, resto: disp - oreTot, altro: altro, mesi: mesi, dal: key(d0), al: key(d1) };
+  }
+
   // Confronto calendario ↔ busta (ore)
   function confronta(stima, busta) {
     var b = busta.ore, o = stima.ore, out = [];
-    function riga(nome, cal, bus) { if (!cal && !bus) return; out.push({ nome: nome, cal: cal, busta: bus, ok: Math.abs(cal - bus) < 0.6 }); }
-    riga('Ore lavorate', o.lavorate, b.lavorate || 0);
-    riga('Ore di notte (60,5%)', o.notte, b.notte);
-    riga('Ore di pomeriggio (27,5%)', o.pom, b.pom);
-    riga('Ore di ferie', o.ferie, b.ferie);
-    riga('Ore di cassa integrazione', o.cig, b.cig);
-    riga('Ore di straordinario', o.straord, b.straord);
-    riga('Ore di corso', o.corsi, b.corsi);
-    riga('Festività di domenica', o.festivita, b.festivita);
+    function riga(id, nome, cal, bus) { cal = cal || 0; bus = bus || 0; if (!cal && !bus) return; out.push({ id: id, nome: nome, cal: cal, busta: bus, ok: Math.abs(cal - bus) < 0.6 }); }
+    riga('lavorate', 'Ore lavorate', o.lavorate, b.lavorate || 0);
+    riga('notte', 'Ore di notte (60,5%)', o.notte, b.notte);
+    riga('pom', 'Ore di pomeriggio (27,5%)', o.pom, b.pom);
+    riga('ferie', 'Ore di ferie', o.ferie, b.ferie);
+    riga('cig', 'Ore di cassa integrazione', o.cig, b.cig);
+    riga('straord', 'Ore di straordinario', o.straord, b.straord);
+    riga('corsi', 'Ore di corso', o.corsi, b.corsi);
+    riga('festivita', 'Festività di domenica', o.festivita, b.festivita);
     return out;
   }
 
@@ -315,6 +356,7 @@
     REGOLE: REGOLE, TURNI: TURNI, TIPI: TIPI, CENTRALI: CENTRALI, infoC: infoC, key: key, parse: parse, monday: monday, turno: turno, giorno: giorno,
     giorniMese: giorniMese, stimaMese: stimaMese, confronta: confronta, giorniDaBusta: giorniDaBusta,
     ferieRol: ferieRol, tredicesima: tredicesima, giornoBusta: giornoBusta, isFesta: isFesta, parametri: parametri,
-    ultimaBusta: ultimaBusta, fmtOre: fmtOre, episodiMalattia: episodiMalattia, malattiaInfo: malattiaInfo
+    ultimaBusta: ultimaBusta, fmtOre: fmtOre, episodiMalattia: episodiMalattia, malattiaInfo: malattiaInfo,
+    euroDifferenza: euroDifferenza, giorniDiversi: giorniDiversi, simulaFerie: simulaFerie
   };
 })(typeof window !== 'undefined' ? window : globalThis);

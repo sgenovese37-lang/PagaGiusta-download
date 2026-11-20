@@ -261,3 +261,44 @@ select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px soli
 .lockbox b { display: block; font-size: 15px; margin-bottom: 2px; }
 .lockbox.warn { background: var(--warn-bg); border-color: var(--warn-bd); color: var(--warn-tx); }
 .lockbox.warn svg { stroke: currentColor; }
+/* più giorni, simulatore, grafici, aggiornamenti */
+.two-btn { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.two-btn .btn { font-size: 15px; }
+.btn[disabled] { opacity: .45; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dates label { min-width: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--tx2); }
+.dates input { min-width: 0; font: inherit; font-size: 16px; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--tx); width: 100%; box-sizing: border-box; min-height: 48px; -webkit-appearance: none; appearance: none; color-scheme: light dark; }
+.sumbox { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 16px; background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok-tx); font-size: 14px; }
+.sumbox b { font-size: 16px; }
+.bk { display: flex; flex-direction: column; gap: 12px; border-color: var(--teal-tx) !important; }
+.bk-h { display: flex; gap: 12px; align-items: flex-start; }
+.bk-h svg { flex: none; stroke: var(--teal-tx); }
+.bk-h b { display: block; font-size: 16px; } .bk-h span { font-size: 14px; color: var(--tx2); }
+.sim { display: flex; flex-direction: column; gap: 12px; }
+.simres { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 16px; font-size: 14px; }
+.simres.ok { background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok-tx); }
+.simres.no { background: var(--warn-bg); border: 1px solid var(--warn-bd); color: var(--warn-tx); }
+.simrow { display: flex; justify-content: space-between; gap: 10px; }
+.simbig { font-size: 17px; margin-top: 4px; }
+.li .sub.neg { color: #DC2626; font-weight: 600; }
+.difftot { font-weight: 700; } .difftot .v.neg { color: #DC2626; }
+.li.gdiff { width: 100%; background: none; border: none; border-bottom: 1px solid var(--line2); color: inherit; font: inherit; text-align: left; align-items: center; }
+.gd2 { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; color: var(--tx2); gap: 2px; text-align: right; }
+.gd2 b { color: var(--tx); }
+.donut { display: flex; flex-direction: column; gap: 12px; }
+.dn-row { display: flex; gap: 14px; align-items: center; }
+.dn-row svg { flex: none; }
+.dn-big { font-size: 22px; font-weight: 800; fill: var(--tx); } .dn-sm { font-size: 11px; fill: var(--tx2); }
+.dn-leg { display: flex; flex-direction: column; gap: 8px; font-size: 13px; min-width: 0; }
+.dn-leg div { display: flex; gap: 8px; align-items: flex-start; }
+.dn-leg i { flex: none; width: 12px; height: 12px; border-radius: 4px; margin-top: 3px; }
+.dn-leg b { display: block; font-size: 14px; }
+.trend { display: flex; flex-direction: column; gap: 12px; }
+.trend .bar { fill: var(--line); } .trend .bar-on { fill: var(--teal-tx); }
+.trend .bar-v { font-size: 10px; font-weight: 700; fill: var(--tx); } .trend .bar-l { font-size: 10px; fill: var(--tx2); }
+.upnote, .upsteps { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+.upnote b, .upsteps > b { font-size: 15px; }
+.upsteps div { display: flex; gap: 10px; align-items: flex-start; }
+.upsteps i { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--teal); color: #fff; font-style: normal; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+.upsafe { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; background: var(--ok-bg); border: 1px solid var(--ok-bd); color: var(--ok-tx); font-size: 14px; }
+.upsafe svg { flex: none; stroke: currentColor; margin-top: 2px; }

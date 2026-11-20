@@ -1,7 +1,7 @@
 /* PagaGiusta web app: funziona anche offline. Prima prova la rete (versione più nuova),
    se la rete non risponde in fretta o manca, usa la copia salvata. Non invia mai dati. */
-var CACHE = 'pagagiusta-v2';
-var FILES = ['./', 'index.html', 'css/app.css', 'js/pdf.js', 'js/busta.js', 'js/calc.js', 'js/app.js', 'manifest.webmanifest', 'img/apple-touch-icon.png', 'img/icon-192.png', 'img/icon-512.png'];
+var CACHE = 'pagagiusta-v3';
+var FILES = ['./', 'index.html', 'css/app.css', 'js/versione.js', 'js/pdf.js', 'js/busta.js', 'js/calc.js', 'js/app.js', 'manifest.webmanifest', 'img/apple-touch-icon.png', 'img/icon-192.png', 'img/icon-512.png'];
 self.addEventListener('install', function (e) {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).catch(function () { }));
