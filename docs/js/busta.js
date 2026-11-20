@@ -275,7 +275,7 @@
         if (/104/.test(d)) { T.titolo = 'Permessi Legge 104'; T.testo = (v.unita ? ore(v.unita) + ' ore di permesso Legge 104. ' : '') + 'Sono permessi pagati: l\'azienda te li anticipa e poi li recupera dall\'INPS.'; break; }
         if (/CIG/.test(d)) { T.titolo = 'Cassa integrazione'; T.testo = (v.unita ? ore(v.unita) + ' ore di cassa integrazione' + (v.valUnit ? ' a ' + n2(v.valUnit, 4) + ' € l\'ora' : '') + '. ' : '') + 'Te la anticipa l\'azienda, poi la paga l\'INPS.'; break; }
         if (/SCIOP/.test(d)) { T.titolo = 'Sciopero'; T.testo = (v.unita ? ore(v.unita) + ' ore di sciopero. ' : '') + 'Le ore di sciopero non sono pagate: vengono tolte dalla paga del mese.'; break; }
-        if (/CHIUS|FERIE COLL/.test(d)) { T.titolo = 'Chiusura aziendale'; T.testo = (v.unita ? ore(v.unita) + ' ore di chiusura aziendale. ' : '') + 'Di solito vengono coperte con le ferie collettive.'; break; }
+        if (/CHIUS|FERIE COLL/.test(d)) { T.titolo = 'Chiusura aziendale'; T.testo = (v.unita ? ore(v.unita) + ' ore di chiusura aziendale. ' : '') + 'Da noi sono coperte con i ROL aziendali e pagate come un giorno di ferie.'; break; }
         if (/PERM/.test(d)) { T.titolo = titoloBello(v.desc); T.testo = (v.unita ? ore(v.unita) + ' ore di permesso. ' : '') + (v.tratt ? 'Sono permessi non pagati: vengono tolti dalla paga.' : 'Ore di permesso del mese.'); break; }
         T.testo = v.comp !== null ? 'Una somma che ti viene pagata.' : v.tratt !== null ? 'Una somma che ti viene trattenuta.' : 'Voce informativa.';
         T.testo += ' L\'app non conosce ancora questa voce: se vuoi, segnalala con "Segnala un problema".';

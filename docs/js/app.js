@@ -233,7 +233,7 @@
     if (g.turno === 'N') ch.push('8 h di notte al 60,5%');
     else if (g.turno === 'P') ch.push('4 h al 27,5% (18–22)');
     else ch.push('Nessuna maggiorazione');
-    ch.push('Buono pasto 9 €');
+    if (g.buono) ch.push('Buono pasto ' + eur(state.buono || C.REGOLE.buono));
     if (g.straord) ch.push('+' + ore(g.straord) + ' h straordinario');
     return { cls: 't-' + g.turno, big: T.nome + ' · ' + T.esteso, chips: ch };
   }
@@ -281,50 +281,108 @@
       '<div class="grid7">' + cells + '</div>' +
       '<div class="legend"><span><i class="sw" style="background:var(--m-bg)"></i>M · 6–14</span><span><i class="sw" style="background:var(--p-bg)"></i>P · 14–22</span><span><i class="sw" style="background:var(--n-bg)"></i>N · 22–6</span>' +
       (state.tipoOrario === 'centrale' ? '<span><i class="sw" style="background:var(--c-bg)"></i>C · ' + C.infoC(state).orario + '</span>' : '') + '<span><i class="sw" style="background:#FDBA74"></i>Ferie</span><span><i class="sw" style="background:#FCA5A5"></i>Cassa int.</span><span><i class="sw" style="background:#DC2626;border-radius:6px;width:8px;height:8px"></i>Straord.</span></div></div>' +
-      '<button class="btn" data-day="' + C.key(oggi) + '">Segna un cambio turno o straordinario</button>' +
+      '<button class="btn" data-dayedit="' + C.key(oggi) + '">Segna un cambio turno o straordinario</button>' +
       '<div class="muted small" style="text-align:center">Tocca un giorno per segnare ferie, ROL, cassa integrazione, malattia o straordinari.</div>' +
       '</div>';
   }
 
-  // ---- Foglio del giorno ----
-  function apriGiorno(k) {
-    var d = C.parse(k), g = C.giorno(state, d), ov = Object.assign({}, state.giorni[k] || {});
-    var tipo = ov.tipo || g.tipo, oreV = ov.ore !== undefined ? ov.ore : (state.oreGiorno || 8), straord = ov.straord || 0;
-    var wk = C.key(C.monday(d)), turnoSett = C.turno(state, d);
-    var orC = (state.settimaneC && state.settimaneC[wk]) || state.centrale || '0730';
+  // ---- Foglio del giorno: prima il riepilogo, poi (se si può) la modifica ----
+  var IC_LOCK = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  var IC_WARN = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+  var NOTE_TIPO = {
+    malattia: 'La malattia è pagata normalmente: in parte dall\'INPS e il resto lo integra l\'azienda. Dalla 3ª malattia breve dell\'anno (fino a 5 giorni) i primi 3 giorni sono pagati al 50%.',
+    chiusura: 'La chiusura aziendale è pagata come un giorno di ferie, ma le ore vengono scalate dai tuoi ROL.',
+    legge104: 'I permessi Legge 104 sono pagati come ore normali, ma in quelle ore non maturano gli incentivi.',
+    permesso: 'Il permesso privato non è pagato: le ore vengono tolte dalla paga.',
+    sciopero: 'Le ore di sciopero non sono pagate: vengono tolte dalla paga, e in quelle ore non maturano gli incentivi.'
+  };
+  var NOMI_G = { lavoro: 'Lavoro', ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integrazione', malattia: 'Malattia', congedo: 'Congedo parentale', legge104: 'Legge 104', corso: 'Corso', permesso: 'Permesso privato', sciopero: 'Sciopero', chiusura: 'Chiusura aziendale', festa: 'Festa', libero: 'Giorno libero' };
+  function meseChiuso(k) { return !!(state.buste && state.buste[k.slice(0, 7)]); }
+
+  function riepilogoGiorno(g) {
+    var k = g.key, T = g.turno ? tInfo(g.turno, C.key(C.monday(g.data))) : null, prev = previsto(g.data);
+    var cls = g.tipo === 'lavoro' ? 't-' + g.turno : g.tipo === 'libero' || g.tipo === 'festa' ? 't-free' : 'x-' + g.tipo;
+    var big, sub = '', righe = [];
+    var oreTipo = { ferie: g.ferie, rol: g.rol, cig: g.cig, corso: g.corso, permesso: g.assenza, congedo: g.congedo, legge104: g.l104, sciopero: g.sciopero }[g.tipo];
+    if (g.tipo === 'lavoro') { big = T.nome + ' · ' + T.esteso; if (prev) sub = 'Previsto dalla rotazione'; }
+    else if (g.tipo === 'libero') big = g.festa ? 'Festa' : 'Giorno libero';
+    else if (g.tipo === 'festa') { big = 'Festa'; sub = 'Pagata nella paga del mese'; }
+    else if (g.tipo === 'malattia' || g.tipo === 'chiusura') big = NOMI_G[g.tipo] + ', giornata intera';
+    else if (oreTipo !== undefined && oreTipo < g.oreGiorno) big = NOMI_G[g.tipo] + ' · ' + ore(oreTipo) + ' ore';
+    else big = NOMI_G[g.tipo] + ', giornata intera';
+    if (g.tipo !== 'lavoro' && g.lavorate > 0 && T) righe.push(['Lavoro', ore(g.lavorate) + ' h · ' + T.nome]);
+    if (g.pom) righe.push(['Maggiorazione pomeriggio', ore(g.pom) + ' h al 27,5%']);
+    if (g.notte) righe.push(['Maggiorazione notte', ore(g.notte) + ' h al 60,5%']);
+    if (g.straord) righe.push(['Straordinario', '+' + ore(g.straord) + ' h']);
+    if (g.tipo === 'malattia') {
+      var mi = C.malattiaInfo(state, k);
+      if (mi && mi.breve) righe.push(['Malattia breve', 'n. ' + mi.n + ' dell\'anno']);
+      if (mi && mi.ridotta) righe.push(['Paga di questo giorno', 'al 50%']);
+    }
+    if (g.tipo !== 'libero') righe.push(['Buono pasto', g.buono ? 'Sì · ' + eur(state.buono || C.REGOLE.buono) : 'No']);
+    return '<div class="today ' + cls + (prev && g.tipo === 'lavoro' ? ' prev' : '') + '"><div class="big" style="font-size:22px">' + esc(big) + '</div>' + (sub ? '<div class="small" style="opacity:.85">' + esc(sub) + '</div>' : '') + '</div>' +
+      (righe.length ? '<div class="card list riep">' + righe.map(function (r) { return '<div class="li"><span>' + esc(r[0]) + '</span><span class="v">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' : '') +
+      (NOTE_TIPO[g.tipo] ? '<div class="muted small">' + NOTE_TIPO[g.tipo] + '</div>' : '') ;
+  }
+
+  function apriGiorno(k, diretto) {
+    var d = C.parse(k), g = C.giorno(state, d), ov, tipo, oreV, straord, wk = C.key(C.monday(d)), turnoSett, orC;
+    function ripristina() {
+      ov = Object.assign({}, state.giorni[k] || {});
+      tipo = ov.tipo || g.tipo; oreV = ov.ore !== undefined ? ov.ore : (state.oreGiorno || 8); straord = ov.straord || 0;
+      turnoSett = C.turno(state, d); orC = (state.settimaneC && state.settimaneC[wk]) || state.centrale || '0730';
+    }
+    ripristina();
+    var chiuso = meseChiuso(k), passato = k < C.key(oggi);
+    var settBloccata = false;
+    for (var i = 0; i < 7; i++) { var x = new Date(C.parse(wk)); x.setDate(x.getDate() + i); if (meseChiuso(C.key(x))) settBloccata = true; }
+    var modo = chiuso ? 'vista' : diretto ? 'diretto' : 'vista', conferma = false;
     var sc = document.createElement('div'); sc.className = 'scrim';
-    function draw() {
+    function titolo() { return '<h2>' + cap(GG[d.getDay()]) + ' ' + d.getDate() + ' ' + MESI[d.getMonth()] + (d.getFullYear() !== oggi.getFullYear() ? ' ' + d.getFullYear() : '') + '</h2>'; }
+    function draw() { if (modo === 'vista') drawVista(); else drawEdit(); }
+    function drawVista() {
+      var piede;
+      if (chiuso) piede = '<div class="lockbox">' + IC_LOCK + '<div><b>Mese chiuso</b>La busta di ' + MESI[d.getMonth()] + ' è già stata importata e controllata: questo giorno non si può più modificare.</div></div>' +
+        '<button class="btn secondary" data-close="1">Chiudi</button>';
+      else if (passato && conferma) piede = '<div class="lockbox warn">' + IC_WARN + '<div><b>Vuoi davvero correggere questo giorno?</b>È un giorno già passato. Correggilo solo se avevi segnato qualcosa di sbagliato, così il controllo della busta resta giusto.</div></div>' +
+        '<button class="btn" data-edit="1">Sì, correggi</button><button class="btn secondary" data-no="1">No, lascia così</button>';
+      else if (passato) piede = '<button class="btn secondary" data-corr="1">Correggi</button><button class="btn secondary" data-close="1">Chiudi</button>';
+      else piede = '<button class="btn" data-edit="1">Modifica</button><button class="btn secondary" data-close="1">Chiudi</button>';
+      sc.innerHTML = '<div class="sheet" role="dialog" aria-label="Giorno"><div class="grab"></div>' + titolo() + riepilogoGiorno(g) + piede + '</div>';
+      var b;
+      if ((b = sc.querySelector('[data-close]'))) b.onclick = function () { sc.remove(); };
+      if ((b = sc.querySelector('[data-edit]'))) b.onclick = function () { modo = 'modifica'; conferma = false; draw(); };
+      if ((b = sc.querySelector('[data-corr]'))) b.onclick = function () { conferma = true; draw(); };
+      if ((b = sc.querySelector('[data-no]'))) b.onclick = function () { conferma = false; draw(); };
+    }
+    function drawEdit() {
       var tipi = ['lavoro', 'ferie', 'rol', 'cig', 'malattia', 'congedo', 'legge104', 'permesso', 'sciopero', 'chiusura', 'corso', 'festa'];
       var nomi = { lavoro: 'Lavoro', ferie: 'Ferie', rol: 'ROL', cig: 'Cassa integr.', malattia: 'Malattia', congedo: 'Congedo', legge104: 'Legge 104', corso: 'Corso', permesso: 'Permesso privato', sciopero: 'Sciopero', chiusura: 'Chiusura aziendale', festa: 'Festa' };
       var weekend = g.weekend;
       var showOre = ['ferie', 'rol', 'cig', 'corso', 'permesso', 'congedo', 'legge104', 'sciopero'].indexOf(tipo) >= 0;
       sc.innerHTML = '<div class="sheet" role="dialog" aria-label="Giorno"><div class="grab"></div>' +
-        '<h2>' + cap(GG[d.getDay()]) + ' ' + d.getDate() + ' ' + MESI[d.getMonth()] + '</h2>' +
-        '<div><div class="stepn" style="margin-bottom:8px">Turno di tutta la settimana</div><div class="seg">' +
+        titolo() +
+        (settBloccata ? '<div class="lockbox">' + IC_LOCK + '<div><b>Turno della settimana non modificabile</b>Una parte di questa settimana è in un mese già chiuso dalla busta. Puoi cambiare solo questo giorno.</div></div><div style="display:none">' : '<div>') + '<div class="stepn" style="margin-bottom:8px">Turno di tutta la settimana</div><div class="seg">' +
         ['M', 'P', 'N', 'C'].map(function (t) { return '<button class="opt t-' + t + (turnoSett === t ? ' on' : '') + '" data-wk="' + t + '">' + tInfo(t).nome + '</button>'; }).join('') + '</div>' +
         (turnoSett === 'C' ? '<div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-top:8px">' + ['0730', '0900'].map(function (k) { return '<button class="opt t-C' + (orC === k ? ' on' : '') + '" data-orc="' + k + '">' + C.CENTRALI[k].esteso + '</button>'; }).join('') + '</div>' : '') +
-        (previsto(d) ? '<div class="muted small" style="margin-top:8px">Questa settimana è <b>prevista</b> dalla rotazione: salvando la confermi.</div>' : '') + '</div>' +
+        (previsto(d) && !settBloccata ? '<div class="muted small" style="margin-top:8px">Questa settimana è <b>prevista</b> dalla rotazione: salvando la confermi.</div>' : '') + '</div>' +
         '<div><div class="stepn" style="margin-bottom:8px">Questo giorno</div><div class="opts">' +
         (weekend ? '<button class="opt' + (tipo === 'libero' ? ' on' : '') + '" data-tipo="libero">Libero</button>' : '') +
         tipi.filter(function (t) { return !weekend || t === 'lavoro' || t === 'corso'; }).map(function (t) { return '<button class="opt' + (tipo === t ? ' on' : '') + '" data-tipo="' + t + '">' + nomi[t] + '</button>'; }).join('') + '</div></div>' +
         (showOre ? '<div class="stepper"><div><b style="font-size:15px">Ore di ' + esc(nomi[tipo].toLowerCase()) + '</b><div class="muted small">8 = giornata intera</div></div><div class="ctr"><button data-o="-1" aria-label="Meno">−</button><b>' + ore(oreV) + '</b><button data-o="1" aria-label="Più">+</button></div></div>' : '') +
         '<div class="stepper"><div><b style="font-size:15px">Straordinario</b><div class="muted small">Ore in più oltre il turno</div></div><div class="ctr"><button data-s="-1" aria-label="Meno">−</button><b>' + ore(straord) + '</b><button data-s="1" aria-label="Più">+</button></div></div>' +
-        (tipo === 'malattia' ? '<div class="muted small">La malattia non viene ancora stimata in euro: l\'app la segna solo nel calendario.</div>' : '') +
-        (tipo === 'chiusura' ? '<div class="muted small">La chiusura aziendale viene pagata con le ferie: le ore vengono scalate dalle tue ferie.</div>' : '') +
-        (tipo === 'legge104' ? '<div class="muted small">I permessi Legge 104 sono pagati come ore normali, ma in quelle ore non maturano gli incentivi.</div>' : '') +
-        (tipo === 'permesso' ? '<div class="muted small">Il permesso privato non è pagato: le ore vengono tolte dalla paga.</div>' : '') +
-        (tipo === 'sciopero' ? '<div class="muted small">Le ore di sciopero non sono pagate: vengono tolte dalla paga, e in quelle ore non maturano incentivi e buono pasto.</div>' : '') +
+        (NOTE_TIPO[tipo] ? '<div class="muted small">' + NOTE_TIPO[tipo] + '</div>' : '') +
         '<button class="btn" data-save="1">Salva</button><button class="btn secondary" data-close="1">Annulla</button></div>';
-      sc.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { tipo = b.getAttribute('data-tipo'); draw(); }; });
-      sc.querySelectorAll('[data-wk]').forEach(function (b) { b.onclick = function () { turnoSett = b.getAttribute('data-wk'); draw(); }; });
-      sc.querySelectorAll('[data-orc]').forEach(function (b) { b.onclick = function () { orC = b.getAttribute('data-orc'); draw(); }; });
-      sc.querySelectorAll('[data-o]').forEach(function (b) { b.onclick = function () { oreV = Math.max(1, Math.min(state.oreGiorno || 8, oreV + +b.getAttribute('data-o'))); draw(); }; });
-      sc.querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { straord = Math.max(0, Math.min(12, straord + +b.getAttribute('data-s'))); draw(); }; });
-      sc.querySelector('[data-close]').onclick = function () { sc.remove(); };
+      sc.querySelectorAll('[data-tipo]').forEach(function (b) { b.onclick = function () { tipo = b.getAttribute('data-tipo'); drawEdit(); }; });
+      sc.querySelectorAll('[data-wk]').forEach(function (b) { b.onclick = function () { turnoSett = b.getAttribute('data-wk'); drawEdit(); }; });
+      sc.querySelectorAll('[data-orc]').forEach(function (b) { b.onclick = function () { orC = b.getAttribute('data-orc'); drawEdit(); }; });
+      sc.querySelectorAll('[data-o]').forEach(function (b) { b.onclick = function () { oreV = Math.max(1, Math.min(state.oreGiorno || 8, oreV + +b.getAttribute('data-o'))); drawEdit(); }; });
+      sc.querySelectorAll('[data-s]').forEach(function (b) { b.onclick = function () { straord = Math.max(0, Math.min(12, straord + +b.getAttribute('data-s'))); drawEdit(); }; });
+      sc.querySelector('[data-close]').onclick = function () { if (modo === 'diretto') sc.remove(); else { modo = 'vista'; ripristina(); draw(); } };
       sc.querySelector('[data-save]').onclick = function () {
-        if (turnoSett !== C.turno(state, d) || previsto(d)) state.settimane[wk] = turnoSett;
+        if (!settBloccata && (turnoSett !== C.turno(state, d) || previsto(d))) state.settimane[wk] = turnoSett;
         state.settimaneC = state.settimaneC || {};
-        if (turnoSett === 'C') state.settimaneC[wk] = orC; else delete state.settimaneC[wk];
+        if (!settBloccata) { if (turnoSett === 'C') state.settimaneC[wk] = orC; else delete state.settimaneC[wk]; }
         var def = g.weekend ? 'libero' : g.festa ? 'festa' : 'lavoro';
         var nv = {};
         if (tipo !== def) nv.tipo = tipo;
@@ -370,7 +428,7 @@
       righe.map(function (r) { return '<div class="li"><span>' + esc(r.voce) + (r.nota ? '<span class="sub">' + esc(r.nota) + '</span>' : '') + '</span><span class="v' + (r.importo < 0 ? ' neg' : '') + '">' + eur(r.importo) + '</span></div>'; }).join('') +
       '<div class="li tot"><span>Lordo totale</span><span>' + eur(lordo) + '</span></div></div>';
     var buoni = '<div class="card list"><div class="li"><span>Buoni pasto Edenred<span class="sub">' + s.buoni + ' giorni lavorati × ' + eur(C.parametri(state).buono) + '</span></span><span class="v">' + eur(s.buoniEuro) + '</span></div></div>';
-    var notes = (s.malattiaNota && !b ? '<div class="muted small">Nel mese ci sono giorni di malattia: non sono ancora stimati in euro.</div>' : '') +
+    var notes = (s.malattiaNota && !b ? '<div class="muted small">Malattia: stima basata sulle regole indicate dal sindacato, da confermare con una busta vera.</div>' : '') +
       (!b && s.righe.some(function (r) { return r.stima; }) ? '<div class="muted small">Le voci con "(stima)" sono indicative: verranno precise quando l\'app conoscerà una tua busta con quelle voci.</div>' : '');
     var tratt = '';
     if (!b && s.trattenute) tratt = '<div class="card list"><div class="li" style="font-weight:700">Trattenute stimate</div>' +
@@ -486,6 +544,7 @@
       };
     });
     document.querySelectorAll('[data-day]').forEach(function (b) { b.onclick = function () { apriGiorno(b.getAttribute('data-day')); }; });
+    document.querySelectorAll('[data-dayedit]').forEach(function (b) { b.onclick = function () { apriGiorno(b.getAttribute('data-dayedit'), true); }; });
     document.querySelectorAll('[data-busta]').forEach(function (b) { b.onclick = function () { ui.bustaSel = b.getAttribute('data-busta'); render(); }; });
     document.querySelectorAll('[data-anc]').forEach(function (b) {
       b.onclick = function () { state.ancora = { settimana: C.key(C.monday(oggi)), turno: b.getAttribute('data-anc') }; delete state.settimane[C.key(C.monday(oggi))]; save(); render(); toast('Turni aggiornati'); };
@@ -604,15 +663,14 @@
   }
 
   // ---------- Tutorial delle novità (dopo ogni aggiornamento) ----------
-  var NOVITA_ID = '1.0-beta-17';
+  var NOVITA_ID = '1.0-beta-18';
   var NOVITA = [
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>',
-      t: 'Turni futuri "previsti"', d: 'Nel calendario le settimane future ora sono sbiadite: sono solo una previsione in base alla rotazione. Diventano sicure quando arriva la settimana, oppure toccando un giorno e salvando. Le settimane passate restano compilate per il controllo della busta.' },
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
-      t: 'Orario centrale per una settimana', d: 'Se una settimana fai l\'orario centrale, tocca un giorno, scegli "Centrale" e poi l\'orario: 7:30 – 16:00 oppure 9:00 – 17:30. La scelta vale solo per quella settimana.' }
-,
-    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M7 13h4M7 17h7"/></svg>',
-      t: 'Calendario più leggibile', d: 'Le caselle del calendario sono più grandi e i turni sono scritti per intero (Mattina, Pomeriggio, Notte, Centrale), come anche ferie, permessi, cassa integrazione e tutte le altre giornate.' }
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4M8 14h8M8 17h5"/></svg>',
+      t: 'Riepilogo del giorno', d: 'Toccando un giorno del calendario ora vedi subito cosa c\'è segnato: turno, ferie, ore, straordinari e buono pasto. Se vuoi cambiarlo, premi "Modifica".' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+      t: 'Giorni passati protetti', d: 'I giorni già passati non si cambiano per sbaglio: per correggerli premi "Correggi" e conferma. Quando importi la busta di un mese, quel mese si chiude: è già stato controllato e non si modifica più.' },
+    { ic: '<svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>',
+      t: 'Regole più precise', d: 'Il buono pasto spetta con almeno 6 ore tra lavoro e corso, e sempre in cassa integrazione. Le chiusure aziendali scalano i ROL. La malattia ora è stimata in euro: dalla 3ª malattia breve dell\'anno i primi 3 giorni sono al 50%.' }
   ];
   function mostraNovita(forza) {
     if (!forza && (!state.onboarded || state.novitaViste === NOVITA_ID)) return;

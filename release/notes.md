@@ -1,3 +1,5 @@
-- Calendario più leggibile: caselle più grandi e nomi scritti per intero
-- Le settimane future sono segnate come previste
-- Orario centrale scelto settimana per settimana (7:30-16:00 o 9:00-17:30)
+- Riepilogo del giorno: toccando un giorno vedi subito cosa c'è segnato, poi Modifica
+- Giorni passati protetti (Correggi + conferma) e mesi con la busta importata chiusi
+- Buono pasto: almeno 6 ore tra lavoro e corso, sempre in cassa integrazione
+- Chiusure aziendali scalate dai ROL
+- Malattia stimata in euro

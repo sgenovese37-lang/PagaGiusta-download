@@ -64,14 +64,14 @@ h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.01em; }
 .day .t { font-size: 10px; font-weight: 700; line-height: 1; opacity: .9; }
 .day.today-ring { box-shadow: 0 0 0 3px var(--teal-tx); }
 .day.empty { background: transparent; pointer-events: none; }
-.day.x-ferie { background: #FDBA74; color: #7C2D12; }
-.day.x-rol { background: #FED7AA; color: #7C2D12; }
-.day.x-cig { background: #FCA5A5; color: #7F1D1D; }
-.day.x-malattia { background: #D8B4FE; color: #4C1D95; }
-.day.x-congedo { background: #F9A8D4; color: #831843; }
-.day.x-corso { background: #A7F3D0; color: #065F46; }
-.day.x-permesso { background: #CBD5E1; color: #1E293B; }
-.day.x-festa { background: var(--free-bg); color: var(--free-tx); }
+.day.x-ferie, .today.x-ferie { background: #FDBA74; color: #7C2D12; }
+.day.x-rol, .today.x-rol { background: #FED7AA; color: #7C2D12; }
+.day.x-cig, .today.x-cig { background: #FCA5A5; color: #7F1D1D; }
+.day.x-malattia, .today.x-malattia { background: #D8B4FE; color: #4C1D95; }
+.day.x-congedo, .today.x-congedo { background: #F9A8D4; color: #831843; }
+.day.x-corso, .today.x-corso { background: #A7F3D0; color: #065F46; }
+.day.x-permesso, .today.x-permesso { background: #CBD5E1; color: #1E293B; }
+.day.x-festa, .today.x-festa { background: var(--free-bg); color: var(--free-tx); }
 .day .dot { position: absolute; top: 4px; right: 5px; width: 6px; height: 6px; border-radius: 3px; background: #DC2626; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; font-size: 12px; color: var(--tx3); padding-top: 10px; }
 .legend span { display: inline-flex; gap: 6px; align-items: center; }
@@ -234,15 +234,15 @@ select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px soli
 .nv .dots i.on { width: 22px; background: var(--teal-tx); }
 .pbar { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; }
 .pbar i { display: block; height: 100%; background: var(--teal-tx); border-radius: 6px; transition: width .2s ease; }
-.day.x-legge104 { background: #99F6E4; color: #134E4A; }
-.day.x-chiusura { background: #FDE047; color: #713F12; }
+.day.x-legge104, .today.x-legge104 { background: #99F6E4; color: #134E4A; }
+.day.x-chiusura, .today.x-chiusura { background: #FDE047; color: #713F12; }
 
 /* input file invisibili ma NON display:none (su iPhone serve per aprire la scelta del file) */
 .fileinp { position: fixed; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0; }
 :root { --c-bg: #BBF7D0; --c-tx: #14532D; }
 .t-C, .opt.t-C, .choice.t-C { background: var(--c-bg); color: var(--c-tx); border-color: transparent; }
 .t-C .chip { background: rgba(20, 83, 45, .1); }
-.day.x-sciopero { background: #E5E7EB; color: #111827; box-shadow: inset 0 0 0 2px #DC2626; }
+.day.x-sciopero, .today.x-sciopero { background: #E5E7EB; color: #111827; box-shadow: inset 0 0 0 2px #DC2626; }
 .seg { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .settings .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .day.prev { opacity: .45; background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 4px, transparent 4px 8px); }
@@ -256,3 +256,12 @@ select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px soli
 .day .t { font-size: 8.5px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; text-align: center; white-space: nowrap; max-width: 100%; }
 .day .t.sm { font-size: 7.4px; letter-spacing: -0.03em; }
 .day.prev { opacity: .55; }
+/* riepilogo del giorno */
+.today[class*="x-"] .chip { background: rgba(0, 0, 0, .08); }
+.today.prev { opacity: .75; border: 2px dashed currentColor !important; }
+.riep .li:last-child { border-bottom: none; }
+.lockbox { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); font-size: 14px; }
+.lockbox svg { flex: none; stroke: var(--tx2); }
+.lockbox b { display: block; font-size: 15px; margin-bottom: 2px; }
+.lockbox.warn { background: var(--warn-bg); border-color: var(--warn-bd); color: var(--warn-tx); }
+.lockbox.warn svg { stroke: currentColor; }

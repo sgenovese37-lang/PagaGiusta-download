@@ -11,6 +11,8 @@
     festDomOre: 6.66,                 // festività caduta di domenica
     incentivi: { '368': 0.82, '369': 0.0717, '390': 0.1813 },
     buono: 9,
+    buonoMinOre: 6,
+    malattiaBreveGiorni: 5, malattiaCarenzaDa: 3, malattiaCarenzaPct: 50,
     ferieMese: 16.667, rolMese: 8.667
   };
 
@@ -87,7 +89,7 @@
     else if (tipo === 'congedo') { g.congedo = ore; g.lavorate = oreG - g.congedo; }
     else if (tipo === 'malattia') { g.malattia = oreG; }
     else if (tipo === 'legge104') { g.l104 = ore; g.lavorate = oreG - g.l104; }
-    else if (tipo === 'chiusura') { g.ferie = oreG; g.chiusura = true; }
+    else if (tipo === 'chiusura') { g.rol = oreG; g.chiusura = true; }
     else if (tipo === 'sciopero') { g.sciopero = ore; g.lavorate = oreG - g.sciopero; }
     if (tipo === 'libero') g.lavorate = 0;
     g.oreGiorno = oreG;
@@ -95,7 +97,8 @@
     g.pom = 0; g.notte = 0;
     if (g.lavorate > 0 && t === 'P') g.pom = Math.max(0, Math.min(REGOLE.pomOre, g.lavorate - 4));
     if (g.lavorate > 0 && t === 'N') g.notte = g.lavorate;
-    g.buono = g.lavorate > 0 ? 1 : 0;
+    // buono pasto: almeno 6 ore tra lavoro, corso e straordinario; in cassa integrazione spetta sempre
+    g.buono = (g.cig > 0 || g.lavorate + g.corso + g.straord >= REGOLE.buonoMinOre) ? 1 : 0;
     return g;
   }
 
@@ -131,6 +134,34 @@
     return p;
   }
 
+  // Malattie dell'anno: giorni di malattia consecutivi (sabati, domeniche e feste non interrompono)
+  function episodiMalattia(state, y) {
+    var keys = Object.keys(state.giorni || {}).filter(function (k) { return k.slice(0, 4) == y && state.giorni[k].tipo === 'malattia'; }).sort();
+    var out = [], cur = null, last = null;
+    keys.forEach(function (k) {
+      var d = parse(k), unito = false;
+      if (cur && last) {
+        unito = true; var x = new Date(last); x.setDate(x.getDate() + 1);
+        while (x < d) { var gx = giorno(state, x); if (!(gx.weekend || gx.festa || gx.tipo === 'libero')) { unito = false; break; } x.setDate(x.getDate() + 1); }
+      }
+      if (!unito) { cur = { giorni: [] }; out.push(cur); }
+      cur.giorni.push(k); last = d;
+    });
+    var nBrevi = 0;
+    out.forEach(function (ep) {
+      ep.breve = ep.giorni.length <= REGOLE.malattiaBreveGiorni;
+      if (ep.breve) { nBrevi++; ep.n = nBrevi; }
+      ep.ridotta = ep.breve && nBrevi >= REGOLE.malattiaCarenzaDa;
+      ep.carenza = ep.giorni.slice(0, 3).map(function (k) { return { key: k, ore: giorno(state, parse(k)).malattia }; });
+    });
+    return out;
+  }
+  function malattiaInfo(state, k) {
+    var eps = episodiMalattia(state, +k.slice(0, 4));
+    for (var i = 0; i < eps.length; i++) if (eps[i].giorni.indexOf(k) >= 0) { var e = eps[i]; return { n: e.n, breve: e.breve, ridotta: e.ridotta && e.giorni.indexOf(k) < 3, giorni: e.giorni.length }; }
+    return null;
+  }
+
   // Stima del mese dal calendario
   function stimaMese(state, y, m) {
     var p = parametri(state), po = p.pagaOraria || 0;
@@ -162,7 +193,16 @@
     if (o.assenze) r.push({ voce: 'Permessi privati · ' + fmtOre(o.assenze) + ' h (non pagati)', importo: -o.assenze * po, stima: true });
     if (o.sciopero) r.push({ voce: 'Sciopero · ' + fmtOre(o.sciopero) + ' h (non pagate)', importo: -o.sciopero * po });
     if (o.l104) r.push({ voce: 'Permessi Legge 104 · ' + fmtOre(o.l104) + ' h', importo: 0, nota: 'Pagati come ore normali (l\'azienda li anticipa per l\'INPS), ma senza incentivi' });
-    if (o.chiusura) r.push({ voce: 'Chiusura aziendale · ' + fmtOre(o.chiusura) + ' h', importo: 0, nota: 'Pagata con le ferie: le ore vengono scalate dalle tue ferie' });
+    if (o.chiusura) r.push({ voce: 'Chiusura aziendale · ' + fmtOre(o.chiusura) + ' h', importo: 0, nota: 'Pagata come un giorno di ferie, ma le ore vengono scalate dai tuoi ROL' });
+    if (o.malattia) {
+      r.push({ voce: 'Malattia · ' + fmtOre(o.malattia) + ' h', importo: 0, nota: 'Pagata normalmente: in parte dall\'INPS e il resto lo integra l\'azienda' });
+      var mk = y + '-' + (m < 10 ? '0' : '') + m, ridotte = 0, nEp = 0;
+      episodiMalattia(state, y).forEach(function (ep) {
+        if (!ep.ridotta) return;
+        ep.carenza.forEach(function (c) { if (c.key.slice(0, 7) === mk) { ridotte += c.ore; nEp = ep.n; } });
+      });
+      if (ridotte) r.push({ voce: 'Malattia breve n. ' + nEp + ' dell\'anno · ' + fmtOre(ridotte) + ' h al ' + REGOLE.malattiaCarenzaPct + '%', importo: -ridotte * po * (100 - REGOLE.malattiaCarenzaPct) / 100, stima: true, nota: 'Dalla ' + REGOLE.malattiaCarenzaDa + 'ª malattia breve dell\'anno i primi 3 giorni sono pagati al ' + REGOLE.malattiaCarenzaPct + '%' });
+    }
     if (p.esoneroPct) {
       var impEs = r.reduce(function (a, x) { return a + x.importo; }, 0) - o.cig * cigOra;
       r.push({ voce: 'Esonero contributivo (stima)', importo: impEs * p.esoneroPct / 100, stima: true, nota: 'Sconto sui contributi presente nella tua ultima busta' });
@@ -275,6 +315,6 @@
     REGOLE: REGOLE, TURNI: TURNI, TIPI: TIPI, CENTRALI: CENTRALI, infoC: infoC, key: key, parse: parse, monday: monday, turno: turno, giorno: giorno,
     giorniMese: giorniMese, stimaMese: stimaMese, confronta: confronta, giorniDaBusta: giorniDaBusta,
     ferieRol: ferieRol, tredicesima: tredicesima, giornoBusta: giornoBusta, isFesta: isFesta, parametri: parametri,
-    ultimaBusta: ultimaBusta, fmtOre: fmtOre
+    ultimaBusta: ultimaBusta, fmtOre: fmtOre, episodiMalattia: episodiMalattia, malattiaInfo: malattiaInfo
   };
 })(typeof window !== 'undefined' ? window : globalThis);
