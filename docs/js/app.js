@@ -724,7 +724,7 @@
     document.querySelectorAll('[data-tab]').forEach(function (b) {
       b.onclick = function () {
         var t = b.getAttribute('data-tab');
-        if (t === 'mese' && ui.tab !== 'mese') { var ub = C.ultimaBusta(state); if (ub) { ui.meseY = +ub.mese.slice(0, 4); ui.meseM = +ub.mese.slice(5, 7); } else { ui.meseY = oggi.getFullYear(); ui.meseM = oggi.getMonth() + 1; } }
+        if (t === 'mese' && ui.tab !== 'mese') { var L0 = limitiMese(), i0 = Math.max(L0.min, Math.min(L0.max, meseIdx(ui.calY, ui.calM))); ui.meseY = Math.floor(i0 / 12); ui.meseM = i0 % 12 + 1; }
         ui.tab = t; if (ui.tab === 'busta') ui.bustaSel = null; render();
       };
     });

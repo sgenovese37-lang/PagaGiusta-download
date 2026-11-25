@@ -1,6 +1,1 @@
-- Segna più giorni insieme (ferie, cassa integrazione, malattia…)
-- Differenze tra busta e turni in euro, con i giorni da controllare
-- Dove vanno i tuoi soldi e andamento mese per mese
-- Prova delle ferie prima di chiederle su EGO
-- Promemoria per salvare una copia dei dati
-- Aggiornamenti spiegati passo per passo
+- "Il mio mese" si apre sul mese in corso: la stima cambia subito quando modifichi un giorno nel calendario
